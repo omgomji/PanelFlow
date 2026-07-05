@@ -49,10 +49,24 @@ export default function AdminLayout({
     '--sidebar-width': `${sidebarWidth}px`,
   } as CSSProperties;
 
+  const [slowLoad, setSlowLoad] = useState(false);
+
+  useEffect(() => {
+    if (!loading) return;
+    const t = setTimeout(() => setSlowLoad(true), 3000);
+    return () => clearTimeout(t);
+  }, [loading]);
+
   if (loading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-surface">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-surface">
         {loading && <div className="h-8 w-8 animate-spin rounded-sm border-b-2 border-stamp border-2" />}
+        {loading && slowLoad && (
+          <div className="text-center">
+            <p className="text-sm font-medium text-ink/70">Waking up the server&hellip;</p>
+            <p className="text-xs text-ink/40 mt-1">This takes ~15s on first load</p>
+          </div>
+        )}
       </div>
     );
   }

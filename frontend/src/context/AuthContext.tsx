@@ -18,10 +18,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Hydrate from /auth/me on mount (cookie is httpOnly — JS can't read it directly)
   useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
     getMe()
       .then((data) => setUser(data.user))
       .catch(() => setUser(null))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        clearTimeout(timeoutId);
+        setLoading(false);
+      });
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
