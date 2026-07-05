@@ -55,14 +55,17 @@ export default function AdminLayout({
 
   useEffect(() => {
     let t: NodeJS.Timeout;
+
     if (loading && loadState === 'loading') {
       t = setTimeout(() => setLoadState('slow'), 3000);
     } else if (!loading && loadState === 'slow' && user) {
       setLoadState('woke');
+    } else if (!loading && loadState === 'woke') {
       t = setTimeout(() => setLoadState('done'), 1500);
-    } else if (!loading && loadState !== 'woke') {
+    } else if (!loading && loadState === 'loading') {
       setLoadState('done');
     }
+
     return () => clearTimeout(t);
   }, [loading, loadState, user]);
 
