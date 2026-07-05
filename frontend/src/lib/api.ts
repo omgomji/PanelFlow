@@ -328,7 +328,9 @@ export interface AuthUser {
   email: string;
   role: 'ADMIN' | 'INTERVIEWER';
   username?: string;
+  timezone?: string;
 }
+
 
 export interface Position {
   id: number;
