@@ -279,7 +279,7 @@ export const getPanels = async (): Promise<Panel[]> => {
   return data;
 };
 
-export const updateUser = async (updates: { timezone?: string }): Promise<{ user: User }> => {
+export const updateUser = async (updates: { timezone?: string }): Promise<{ user: AuthUser }> => {
   const { data } = await api.patch('/users/me', updates);
   return data;
 };
