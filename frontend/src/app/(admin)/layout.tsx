@@ -50,21 +50,42 @@ export default function AdminLayout({
   } as CSSProperties;
 
   const [slowLoad, setSlowLoad] = useState(false);
+  const [justWoke, setJustWoke] = useState(false);
 
   useEffect(() => {
-    if (!loading) return;
-    const t = setTimeout(() => setSlowLoad(true), 3000);
-    return () => clearTimeout(t);
-  }, [loading]);
+    if (loading) {
+      const t = setTimeout(() => setSlowLoad(true), 3000);
+      return () => clearTimeout(t);
+    } else if (slowLoad && user) {
+      // Backend just finished loading after being slow, and we got a user back!
+      setJustWoke(true);
+      const t = setTimeout(() => setJustWoke(false), 1500);
+      return () => clearTimeout(t);
+    }
+  }, [loading, slowLoad, user]);
 
-  if (loading || !user) {
+  if (loading || justWoke || (!loading && !user)) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-surface">
-        {loading && <div className="h-8 w-8 animate-spin rounded-sm border-b-2 border-stamp border-2" />}
+        {(loading || justWoke) && (
+          <div className={`flex items-center justify-center h-8 w-8 rounded-sm border-2 ${
+            justWoke ? 'border-pine bg-pine/10 text-pine' : 'border-stamp border-b-transparent animate-spin'
+          }`}>
+             {justWoke && <span className="material-symbols-outlined text-xl">check</span>}
+          </div>
+        )}
+        
         {loading && slowLoad && (
-          <div className="text-center">
+          <div className="text-center animate-in fade-in duration-500">
             <p className="text-sm font-medium text-ink/70">Waking up the server&hellip;</p>
             <p className="text-xs text-ink/40 mt-1">This takes ~15s on first load</p>
+          </div>
+        )}
+
+        {justWoke && (
+          <div className="text-center animate-in zoom-in-95 fade-in duration-300">
+            <p className="text-sm font-medium text-pine">Backend woke up!</p>
+            <p className="text-xs text-pine/60 mt-1">Starting application</p>
           </div>
         )}
       </div>
