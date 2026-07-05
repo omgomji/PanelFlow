@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 
 
-export function middleware(req: NextRequest) {
+export default function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
 

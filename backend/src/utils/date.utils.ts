@@ -15,7 +15,7 @@ import {
 
 export const IST_TIMEZONE = 'Asia/Kolkata';
 
-export function toUtcOrBadRequest(
+function toUtcOrBadRequest(
   localDateTime: string,
   timezone: string,
   errorMessage: string
@@ -28,14 +28,14 @@ export function toUtcOrBadRequest(
   return utcDate;
 }
 
-export function formatUtcDateToYyyyMmDd(date: Date): string {
+function formatUtcDateToYyyyMmDd(date: Date): string {
   const y = date.getUTCFullYear();
   const m = String(date.getUTCMonth() + 1).padStart(2, '0');
   const d = String(date.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
 
-export function convertIsoDayToJsDay(isoDay: number): number {
+function convertIsoDayToJsDay(isoDay: number): number {
   return isoDay % 7;
 }
 

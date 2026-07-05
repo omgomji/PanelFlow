@@ -56,6 +56,3 @@ export const requireRole = (role: 'ADMIN' | 'INTERVIEWER') => {
   };
 };
 
-// Kept for backward compat during transition — routes that used adminAuth
-// now use requireAuth directly; this alias prevents compile errors during migration.
-export const adminAuth = requireAuth;

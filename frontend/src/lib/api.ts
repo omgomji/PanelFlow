@@ -151,7 +151,7 @@ export const getPublicProfile = async (username: string): Promise<PublicProfileD
   return response.data;
 };
 
-export const getPublicEventTypes = getPublicProfile;
+
 
 export const getPublicEventDetails = async (username: string, slug: string): Promise<PublicEventData> => {
   const response = await api.get<PublicEventData>(`/public/${username}/${slug}`);
@@ -234,18 +234,7 @@ export const createPosition = async (data: {
   return response.data;
 };
 
-export const updatePosition = async (
-  id: number,
-  data: { title?: string; description?: string; status?: 'OPEN' | 'CLOSED' }
-): Promise<Position> => {
-  const response = await api.put<Position>(`/positions/${id}`, data);
-  return response.data;
-};
 
-export const deletePosition = async (id: number) => {
-  const response = await api.delete(`/positions/${id}`);
-  return response.data;
-};
 
 // ── Admin: Panels ─────────────────────────────────────────────
 export const createPanel = async (
@@ -256,38 +245,14 @@ export const createPanel = async (
   return response.data;
 };
 
-export const updatePanel = async (
-  id: number,
-  data: { title?: string; slug?: string; duration?: number; isActive?: boolean }
-): Promise<Panel> => {
-  const response = await api.put<Panel>(`/panels/${id}`, data);
-  return response.data;
-};
 
-export const addPanelInterviewer = async (panelId: number, userId: number) => {
-  const response = await api.post(`/panels/${panelId}/interviewers`, { userId });
-  return response.data;
-};
-
-export const removePanelInterviewer = async (panelId: number, userId: number) => {
-  const response = await api.delete(`/panels/${panelId}/interviewers/${userId}`);
-  return response.data;
-};
-
-export const getPanels = async (): Promise<Panel[]> => {
-  const { data } = await api.get('/panels');
-  return data;
-};
 
 export const updateUser = async (updates: { timezone?: string }): Promise<{ user: AuthUser }> => {
   const { data } = await api.patch('/users/me', updates);
   return data;
 };
 
-export const getMyPanels = async (): Promise<Panel[]> => {
-  const response = await api.get<Panel[]>('/panels/my');
-  return response.data;
-};
+
 
 // ── Admin: Users ──────────────────────────────────────────────
 export const getInterviewers = async (): Promise<AuthUser[]> => {
@@ -311,10 +276,7 @@ export const createContact = async (data: ContactPayload): Promise<Contact> => {
   return response.data;
 };
 
-export const updateContact = async (id: number, data: ContactPayload): Promise<Contact> => {
-  const response = await api.put<Contact>(`/contacts/${id}`, data);
-  return response.data;
-};
+
 
 export const deleteContact = async (id: number) => {
   const response = await api.delete(`/contacts/${id}`);

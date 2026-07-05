@@ -33,7 +33,7 @@ export function toMinutes(time: string) {
   return hour * 60 + minute;
 }
 
-export function parseIntervalTimes(
+function parseIntervalTimes(
   startTimeRaw: string,
   endTimeRaw: string,
   formatError: string,

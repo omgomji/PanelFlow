@@ -3,9 +3,8 @@
 import { useEffect, useState } from 'react';
 
 const HEALTH_URL = (() => {
-  const base = process.env.NEXT_PUBLIC_API_URL;
-  if (base) return `${base}/health`;
-  return 'http://localhost:5000/api/health';
+  const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+  return base.replace(/\/api\/?$/, '') + '/health';
 })();
 
 const RETRY_INTERVAL_MS = 4000;
@@ -76,7 +75,7 @@ export default function RenderWakeupBanner() {
         padding: '12px 20px',
         borderRadius: '12px',
         boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-        background: isReady
+        background: state === 'ready'
           ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
           : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
         color: '#fff',
@@ -101,7 +100,7 @@ export default function RenderWakeupBanner() {
         }
       `}</style>
 
-      {isReady ? (
+      {state === 'ready' ? (
         <>
           <span style={{ fontSize: '18px' }}>✅</span>
           <span>Backend is awake — loading your data now!</span>
