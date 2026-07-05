@@ -49,40 +49,44 @@ export default function AdminLayout({
     '--sidebar-width': `${sidebarWidth}px`,
   } as CSSProperties;
 
-  const [slowLoad, setSlowLoad] = useState(false);
-  const [justWoke, setJustWoke] = useState(false);
+  const [loadState, setLoadState] = useState<'loading' | 'slow' | 'woke' | 'done'>(
+    loading ? 'loading' : 'done'
+  );
 
   useEffect(() => {
-    if (loading) {
-      const t = setTimeout(() => setSlowLoad(true), 3000);
-      return () => clearTimeout(t);
-    } else if (slowLoad && user) {
-      // Backend just finished loading after being slow, and we got a user back!
-      setJustWoke(true);
-      const t = setTimeout(() => setJustWoke(false), 1500);
-      return () => clearTimeout(t);
+    let t: NodeJS.Timeout;
+    if (loading && loadState === 'loading') {
+      t = setTimeout(() => setLoadState('slow'), 3000);
+    } else if (!loading && loadState === 'slow' && user) {
+      setLoadState('woke');
+      t = setTimeout(() => setLoadState('done'), 1500);
+    } else if (!loading && loadState !== 'woke') {
+      setLoadState('done');
     }
-  }, [loading, slowLoad, user]);
+    return () => clearTimeout(t);
+  }, [loading, loadState, user]);
 
-  if (loading || justWoke || (!loading && !user)) {
+  const showLoading = loadState !== 'done' || (!loading && !user);
+
+  if (showLoading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-surface">
-        {(loading || justWoke) && (
+        {(loadState === 'loading' || loadState === 'slow' || loadState === 'woke') && (
           <div className={`flex items-center justify-center h-8 w-8 rounded-sm border-2 ${
-            justWoke ? 'border-pine bg-pine/10 text-pine' : 'border-stamp border-b-transparent animate-spin'
+            loadState === 'woke' ? 'border-pine bg-pine/10 text-pine' : 'border-stamp border-b-transparent animate-spin'
           }`}>
-             {justWoke && <span className="material-symbols-outlined text-xl">check</span>}
+             {loadState === 'woke' && <span className="material-symbols-outlined text-xl">check</span>}
           </div>
         )}
         
-        {loading && slowLoad && (
+        {loadState === 'slow' && (
           <div className="text-center animate-in fade-in duration-500">
             <p className="text-sm font-medium text-ink/70">Waking up the server&hellip;</p>
             <p className="text-xs text-ink/40 mt-1">This takes ~15s on first load</p>
           </div>
         )}
 
-        {justWoke && (
+        {loadState === 'woke' && (
           <div className="text-center animate-in zoom-in-95 fade-in duration-300">
             <p className="text-sm font-medium text-pine">Backend woke up!</p>
             <p className="text-xs text-pine/60 mt-1">Starting application</p>
