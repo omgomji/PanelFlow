@@ -19,9 +19,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Hydrate from /auth/me on mount (cookie is httpOnly — JS can't read it directly)
   useEffect(() => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-    getMe()
+    getMe(controller.signal)
       .then((data) => {
         document.cookie = 'isLoggedIn=true; path=/; max-age=21600';
         setUser(data.user);

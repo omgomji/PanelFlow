@@ -70,8 +70,8 @@ export const logout = async () => {
   return response.data;
 };
 
-export const getMe = async () => {
-  const response = await api.get<{ user: AuthUser }>('/auth/me');
+export const getMe = async (signal?: AbortSignal) => {
+  const response = await api.get<{ user: AuthUser }>('/auth/me', { signal });
   return response.data;
 };
 
