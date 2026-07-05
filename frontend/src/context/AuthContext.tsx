@@ -22,8 +22,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const timeoutId = setTimeout(() => controller.abort(), 12000);
 
     getMe()
-      .then((data) => setUser(data.user))
-      .catch(() => setUser(null))
+      .then((data) => {
+        document.cookie = 'isLoggedIn=true; path=/; max-age=604800';
+        setUser(data.user);
+      })
+      .catch(() => {
+        document.cookie = 'isLoggedIn=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        setUser(null);
+      })
       .finally(() => {
         clearTimeout(timeoutId);
         setLoading(false);
@@ -38,13 +44,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     await apiLogin(email, password);
     const data = await getMe();
+    document.cookie = 'isLoggedIn=true; path=/; max-age=604800';
     setUser(data.user);
   }, []);
 
   const logout = useCallback(async () => {
-    await apiLogout();
-    setUser(null);
-    window.location.href = '/login';
+    try {
+      await apiLogout();
+    } finally {
+      document.cookie = 'isLoggedIn=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      setUser(null);
+      window.location.href = '/login';
+    }
   }, []);
 
   return (

@@ -33,11 +33,10 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for either the new short-lived accessToken or the long-lived refreshToken
-  const accessToken = req.cookies.get('accessToken');
-  const refreshToken = req.cookies.get('refreshToken');
+  // Check for the frontend-specific isLoggedIn cookie
+  const isLoggedIn = req.cookies.get('isLoggedIn');
 
-  if (!accessToken && !refreshToken) {
+  if (!isLoggedIn) {
     const loginUrl = new URL('/login', req.url);
     loginUrl.searchParams.set('from', pathname);
     return NextResponse.redirect(loginUrl);
