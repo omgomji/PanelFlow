@@ -76,17 +76,11 @@ export const authService = {
       throw new UnauthorizedError('Invalid email or password');
     }
 
-    const accessToken = jwt.sign(
-      { userId: user.id, role: user.role },
-      getJwtSecret(),
-      { expiresIn: '15m' }
-    );
-
-    const refreshToken = jwt.sign(
-      { userId: user.id, role: user.role, type: 'refresh' },
-      getJwtSecret(),
-      { expiresIn: '7d' }
-    );
+    const payload = { userId: user.id, role: user.role };
+    const accessToken = jwt.sign(payload, getJwtSecret(), { expiresIn: '15m' });
+    const refreshToken = jwt.sign({ ...payload, type: 'refresh' }, getJwtSecret(), {
+      expiresIn: '6h',
+    });
 
     return { accessToken, refreshToken };
   },

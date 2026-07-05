@@ -23,7 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     getMe()
       .then((data) => {
-        document.cookie = 'isLoggedIn=true; path=/; max-age=604800';
+        document.cookie = 'isLoggedIn=true; path=/; max-age=21600';
         setUser(data.user);
       })
       .catch(() => {
@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     await apiLogin(email, password);
     const data = await getMe();
-    document.cookie = 'isLoggedIn=true; path=/; max-age=604800';
+    document.cookie = 'isLoggedIn=true; path=/; max-age=21600';
     setUser(data.user);
   }, []);
 

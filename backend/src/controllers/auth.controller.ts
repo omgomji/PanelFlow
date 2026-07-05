@@ -13,7 +13,7 @@ import { authService } from '../services/auth.service';
 import { BadRequestError, UnauthorizedError } from '../utils/errors';
 
 const ACCESS_TOKEN_MAX_AGE = 15 * 60 * 1000; // 15 mins in ms
-const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
+const REFRESH_TOKEN_MAX_AGE = 6 * 60 * 60 * 1000; // 6 hours in ms
 
 function setCookieOptions(isProd: boolean, maxAge: number) {
   return {
