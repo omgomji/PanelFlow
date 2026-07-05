@@ -1,19 +1,20 @@
 /**
- * PostgreSQL Exclusion Constraint Setup
+ * PostgreSQL Exclusion & Check Constraint Setup
  *
- * This script applies the database-level exclusion constraint that
- * prevents overlapping SCHEDULED bookings for the same user.
+ * This script applies database-level constraints that prevent:
+ *   1. Overlapping SCHEDULED bookings for the same host (on BookingHost)
+ *   2. A Booking being both individual and panel, or neither
  *
  * WHY THIS EXISTS:
- * Prisma cannot express PostgreSQL exclusion constraints in its schema DSL.
- * The application-layer $transaction check (in bookings.service.ts) catches
- * 99% of conflicts, but under high concurrency the TOCTOU race condition
+ * Prisma cannot express PostgreSQL exclusion constraints or CHECK constraints
+ * in its schema DSL. The application-layer $transaction check (in bookings.service.ts)
+ * catches 99% of conflicts, but under high concurrency the TOCTOU race condition
  * means two transactions can both pass the SELECT check simultaneously.
  * The exclusion constraint is the database-level guarantee that prevents this.
  *
  * REQUIRES:
  *   - btree_gist extension (enables GiST index on scalar types)
- *   - userId column on bookings (added in schema_fixes.md)
+ *   - BookingHost table (added in Phase 1 schema update)
  *
  * Run with: npx ts-node prisma/setup-constraints.ts
  */
@@ -22,7 +23,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🔧 Setting up PostgreSQL exclusion constraint...');
+  console.log('🔧 Setting up PostgreSQL constraints...');
 
   // Enable btree_gist extension — required for exclusion constraints
   // that combine scalar columns (userId) with range types (tstzrange)
@@ -31,20 +32,14 @@ async function main() {
   );
   console.log('  ✓ btree_gist extension enabled');
 
-  // Drop existing constraint if re-running this script
+  // ── Original: Booking-level exclusion constraint ────────────────────────
+  // Drop and re-apply in case of re-run.
   await prisma.$executeRawUnsafe(
     `ALTER TABLE "Booking" DROP CONSTRAINT IF EXISTS no_overlapping_bookings;`
   );
 
-  // Add the exclusion constraint:
-  // For any given userId, no two SCHEDULED bookings can have overlapping
-  // [startTime, endTime) time ranges.
-  //
-  // Column names match Prisma's default mapping (camelCase):
-  //   model field "userId"    → column "userId"
-  //   model field "startTime" → column "startTime"
-  //   model field "endTime"   → column "endTime"
-  //   enum value SCHEDULED    → stored as 'SCHEDULED'
+  // For individual bookings: userId on Booking prevents the host from being
+  // double-booked across all their event types.
   await prisma.$executeRawUnsafe(`
     ALTER TABLE "Booking"
     ADD CONSTRAINT no_overlapping_bookings
@@ -52,9 +47,45 @@ async function main() {
       "userId" WITH =,
       tsrange("startTime", "endTime") WITH &&
     )
-    WHERE (status = 'SCHEDULED'::"BookingStatus");
+    WHERE (status = 'SCHEDULED'::"BookingStatus" AND "userId" IS NOT NULL);
   `);
-  console.log('  ✓ Exclusion constraint no_overlapping_bookings applied');
+  console.log('  ✓ Exclusion constraint no_overlapping_bookings applied to Booking');
+
+  // ── New: BookingHost-level exclusion constraint ─────────────────────────
+  // Same mechanism, scoped to per-host rows so it catches conflicts across
+  // both individual and panel bookings (all write a BookingHost row).
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "BookingHost" DROP CONSTRAINT IF EXISTS no_overlapping_host_bookings;`
+  );
+
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "BookingHost"
+    ADD CONSTRAINT no_overlapping_host_bookings
+    EXCLUDE USING gist (
+      "userId" WITH =,
+      tsrange("startTime", "endTime") WITH &&
+    )
+    WHERE ("status" = 'SCHEDULED'::"BookingStatus");
+  `);
+  console.log('  ✓ Exclusion constraint no_overlapping_host_bookings applied to BookingHost');
+
+  // ── New: Booking mutual-exclusivity CHECK ───────────────────────────────
+  // A Booking is either individual (eventTypeId + userId set, panelId NULL)
+  // or panel (panelId set, eventTypeId + userId NULL) — never both, never neither.
+  // This is the "don't trust app code alone" philosophy already used above.
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "Booking" DROP CONSTRAINT IF EXISTS booking_exactly_one_kind;`
+  );
+
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "Booking"
+    ADD CONSTRAINT booking_exactly_one_kind
+    CHECK (
+      ("eventTypeId" IS NOT NULL AND "userId" IS NOT NULL AND "panelId" IS NULL) OR
+      ("eventTypeId" IS NULL AND "userId" IS NULL AND "panelId" IS NOT NULL)
+    );
+  `);
+  console.log('  ✓ CHECK constraint booking_exactly_one_kind applied to Booking');
 
   console.log('✅ Database constraints configured successfully!');
 }

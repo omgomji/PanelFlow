@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import Sidebar from '@/components/Sidebar';
 import TopBar from '@/components/TopBar';
 
@@ -15,6 +17,14 @@ export default function AdminLayout({
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const { loading, user } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/login');
+    }
+  }, [loading, user, router]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -39,16 +49,24 @@ export default function AdminLayout({
     '--sidebar-width': `${sidebarWidth}px`,
   } as CSSProperties;
 
+  if (loading || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface">
+        {loading && <div className="h-8 w-8 animate-spin rounded-sm border-b-2 border-stamp border-2" />}
+      </div>
+    );
+  }
+
   return (
-    <div className="cal-ui-shell flex min-h-screen bg-surface selection:bg-primary/10">
-      {mobileSidebarOpen ? (
+    <div className="cal-ui-shell flex min-h-screen bg-paper selection:bg-stamp/10">
+      {mobileSidebarOpen && (
         <button
           type="button"
           aria-label="Close navigation"
           onClick={() => setMobileSidebarOpen(false)}
-          className="fixed inset-0 z-40 bg-slate-900/35 lg:hidden"
+          className="fixed inset-0 z-40 bg-ink/20 lg:hidden"
         />
-      ) : null}
+      )}
 
       <Sidebar
         collapsed={sidebarCollapsed}
@@ -63,7 +81,7 @@ export default function AdminLayout({
           onMobileMenuToggle={() => setMobileSidebarOpen((prev) => !prev)}
         />
         <main
-          className="flex-1 mt-14 overflow-y-auto bg-white p-4 sm:p-6 lg:p-10 lg:ml-[var(--sidebar-width)]"
+          className="flex-1 mt-14 overflow-y-auto bg-paper p-4 sm:p-6 lg:p-10 lg:ml-sidebar transition-all duration-300"
           style={sidebarDesktopStyle}
         >
           <div className="w-full max-w-5xl">{children}</div>

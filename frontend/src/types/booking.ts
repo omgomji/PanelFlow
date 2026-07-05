@@ -12,6 +12,15 @@ export interface MeetingRecord {
     slug?: string;
     duration?: number;
   };
+  panel?: {
+    id: number;
+    title: string;
+    position?: {
+      id: number;
+      title: string;
+    };
+  };
+  cancellationReason?: string | null;
   createdAt?: string;
 }
 

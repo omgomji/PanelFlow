@@ -7,19 +7,42 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  ADMIN
+  INTERVIEWER
+}
+
+enum PositionStatus {
+  OPEN
+  CLOSED
+}
+
+enum BookingStatus {
+  SCHEDULED
+  CANCELLED
+  NO_SHOW
+}
+
 /// The host/admin who owns event types and availability.
-/// Even though auth is out of scope, a users table is the root entity
-/// that owns *everything* — event types, schedules, and bookings.
+/// passwordHash stores bcrypt hash; role defaults to INTERVIEWER.
+/// ADMIN accounts are created only via seed, never through the register endpoint.
 model User {
   id                   Int                   @id @default(autoincrement())
   username             String                @unique
   name                 String
   email                String                @unique
   timezone             String                @default("Asia/Kolkata")
+  passwordHash         String                @default("")
+  role                 Role                  @default(INTERVIEWER)
   availabilitySchedule AvailabilitySchedule?
   bookings             Booking[]
   contacts             Contact[]
   eventTypes           EventType[]
+  createdPositions     Position[]
+  panelMemberships     PanelInterviewer[]
+  hostedBookings       BookingHost[]
+  feedback             Feedback[]
+  webhookEndpoints     WebhookEndpoint[]
 }
 
 /// A bookable meeting template (e.g. "30 Min Interview").
@@ -41,29 +64,29 @@ model EventType {
 /// Per-user schedule container. Holds the host's timezone and groups
 /// the individual day rules. One schedule per user (MVP).
 model AvailabilitySchedule {
-  id                       Int               @id @default(autoincrement())
-  userId                   Int               @unique
-  timezone                 String
-  beforeEventBufferMinutes Int               @default(0)
-  afterEventBufferMinutes  Int               @default(0)
-  startTimeIncrementMinutes Int              @default(30)
-  minimumNoticeMinutes      Int              @default(0)
-  maximumDaysInFuture       Int              @default(60)
-  allowBackToBack           Boolean          @default(true)
-  days                     AvailabilityDay[]
-  dateOverrides            AvailabilityDateOverride[]
-  user                     User              @relation(fields: [userId], references: [id])
+  id                        Int                      @id @default(autoincrement())
+  userId                    Int                      @unique
+  timezone                  String
+  beforeEventBufferMinutes  Int                      @default(0)
+  afterEventBufferMinutes   Int                      @default(0)
+  startTimeIncrementMinutes Int                      @default(30)
+  minimumNoticeMinutes      Int                      @default(0)
+  maximumDaysInFuture       Int                      @default(60)
+  allowBackToBack           Boolean                  @default(true)
+  days                      AvailabilityDay[]
+  dateOverrides             AvailabilityDateOverride[]
+  user                      User                     @relation(fields: [userId], references: [id])
 }
 
 /// Individual day-level availability rule (e.g. "Monday 09:00–17:00").
 /// Times are LOCAL to the schedule's timezone — not UTC.
 /// This preserves human intent across DST transitions.
 model AvailabilityDay {
-  id         Int                  @id @default(autoincrement())
+  id         Int                    @id @default(autoincrement())
   scheduleId Int
   dayOfWeek  Int
   intervals  AvailabilityInterval[]
-  schedule   AvailabilitySchedule @relation(fields: [scheduleId], references: [id])
+  schedule   AvailabilitySchedule   @relation(fields: [scheduleId], references: [id])
 
   @@unique([scheduleId, dayOfWeek])
 }
@@ -85,11 +108,11 @@ model AvailabilityInterval {
 /// Date-specific availability rules that override weekly day rules.
 /// Example: 2026-12-25 can be marked unavailable or custom hours.
 model AvailabilityDateOverride {
-  id        Int                               @id @default(autoincrement())
+  id         Int                               @id @default(autoincrement())
   scheduleId Int
-  date      DateTime                          @db.Date
-  intervals AvailabilityDateOverrideInterval[]
-  schedule  AvailabilitySchedule              @relation(fields: [scheduleId], references: [id])
+  date       DateTime                          @db.Date
+  intervals  AvailabilityDateOverrideInterval[]
+  schedule   AvailabilitySchedule              @relation(fields: [scheduleId], references: [id])
 
   @@unique([scheduleId, date])
   @@index([scheduleId, date])
@@ -109,33 +132,102 @@ model AvailabilityDateOverrideInterval {
   @@index([overrideId, startTime, endTime])
 }
 
+/// A job opening that groups one or more interview panels under a shared title.
+/// Created by ADMIN users; panels within a position share the same candidate pipeline.
+model Position {
+  id          Int            @id @default(autoincrement())
+  title       String
+  description String?
+  status      PositionStatus @default(OPEN)
+  createdById Int
+  createdBy   User           @relation(fields: [createdById], references: [id])
+  panels      Panel[]
+  createdAt   DateTime       @default(now())
+}
+
+/// A named interview panel within a position (e.g. "Technical Round").
+/// Slug is globally unique (not scoped to Position) so the public booking URL
+/// /panel/:slug never collides across different positions.
+model Panel {
+  id           Int                @id @default(autoincrement())
+  positionId   Int
+  title        String
+  slug         String             @unique
+  duration     Int
+  isActive     Boolean            @default(true)
+  position     Position           @relation(fields: [positionId], references: [id])
+  interviewers PanelInterviewer[]
+  bookings     Booking[]
+}
+
+/// Join table: which interviewers sit on a given panel.
+/// The @@unique constraint prevents adding the same interviewer twice.
+model PanelInterviewer {
+  id      Int   @id @default(autoincrement())
+  panelId Int
+  userId  Int
+  panel   Panel @relation(fields: [panelId], references: [id])
+  user    User  @relation(fields: [userId], references: [id])
+
+  @@unique([panelId, userId])
+}
+
 /// A confirmed (or cancelled) meeting between a host and an invitee.
 ///
-/// userId is denormalised from eventType.userId for two reasons:
+/// eventTypeId + userId are set for individual bookings (existing path, unchanged).
+/// panelId is set for panel bookings (new path). The booking_exactly_one_kind
+/// CHECK constraint (in setup-constraints.ts) enforces mutual exclusivity at the DB level.
+///
+/// userId on individual bookings is denormalised from eventType.userId for two reasons:
 /// 1. The PostgreSQL exclusion constraint (no_overlapping_bookings) needs
 /// userId as a local column — it cannot reference columns in other tables.
 /// 2. Every major query (upcoming meetings, overlap check) filters by userId.
 /// Having it local eliminates the JOIN for filtering.
-///
-/// userId is immutable after creation — no update anomaly risk.
-/// See schema_fixes.md for the full justification.
 model Booking {
   id           Int           @id @default(autoincrement())
   uid          String        @unique @default(uuid())
-  eventTypeId  Int
-  userId       Int
+  eventTypeId  Int?
+  userId       Int?
+  panelId      Int?
   inviteeName  String
   inviteeEmail String
   startTime    DateTime
   endTime      DateTime
   status       BookingStatus @default(SCHEDULED)
+  reminderSentAt     DateTime?
+  cancellationReason String?
   createdAt    DateTime      @default(now())
-  eventType    EventType     @relation(fields: [eventTypeId], references: [id])
-  user         User          @relation(fields: [userId], references: [id])
+  eventType    EventType?    @relation(fields: [eventTypeId], references: [id])
+  user         User?         @relation(fields: [userId], references: [id])
+  panel        Panel?        @relation(fields: [panelId], references: [id])
+  hosts        BookingHost[]
+  feedback     Feedback[]
 
   @@index([userId, status, startTime, endTime])
   @@index([userId, startTime])
   @@index([startTime])
+  @@index([panelId])
+}
+
+/// Per-interviewer leg of a booking. Exists for BOTH individual and panel bookings
+/// (one row for individual, N rows for panel) so a single exclusion constraint here
+/// catches double-booking conflicts across booking types — see setup-constraints.ts.
+/// startTime/endTime/status are denormalized copies of the parent Booking's values,
+/// kept in sync on create/cancel/reschedule, purely so the exclusion constraint
+/// (which needs its columns local to this table) can be declared on userId here.
+model BookingHost {
+  id        Int           @id @default(autoincrement())
+  bookingId Int
+  userId    Int
+  startTime DateTime
+  endTime   DateTime
+  status    BookingStatus
+  booking   Booking       @relation(fields: [bookingId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
+
+  @@unique([bookingId, userId])
+  @@index([bookingId])
+  @@index([userId, status, startTime, endTime])
 }
 
 /// A CRM-style person record for the host's admin workspace.
@@ -155,7 +247,54 @@ model Contact {
   @@index([userId, createdAt])
 }
 
-enum BookingStatus {
-  SCHEDULED
-  CANCELLED
+/// Admin-registered outbound webhook. Secret is stored in plaintext — it's an
+/// outbound signing key our backend must read to sign requests, not an inbound
+/// credential, so hashing it (like a password) would make it unusable.
+model WebhookEndpoint {
+  id         Int               @id @default(autoincrement())
+  userId     Int
+  url        String
+  secret     String
+  events     String[]
+  isActive   Boolean           @default(true)
+  createdAt  DateTime          @default(now())
+  user       User              @relation(fields: [userId], references: [id])
+  deliveries WebhookDelivery[]
+}
+
+model WebhookDelivery {
+  id         Int             @id @default(autoincrement())
+  endpointId Int
+  event      String
+  payload    Json
+  statusCode Int?
+  success    Boolean         @default(false)
+  attempt    Int             @default(1)
+  createdAt  DateTime        @default(now())
+  endpoint   WebhookEndpoint @relation(fields: [endpointId], references: [id])
+
+  @@index([endpointId, createdAt])
+}
+
+enum Recommendation {
+  STRONG_NO
+  NO
+  YES
+  STRONG_YES
+}
+
+/// Structured post-interview feedback submitted by a panelist.
+model Feedback {
+  id             Int            @id @default(autoincrement())
+  bookingId      Int
+  interviewerId  Int
+  recommendation Recommendation
+  notes          String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  booking        Booking        @relation(fields: [bookingId], references: [id])
+  interviewer    User           @relation(fields: [interviewerId], references: [id])
+
+  @@unique([bookingId, interviewerId])
+  @@index([bookingId])
 }

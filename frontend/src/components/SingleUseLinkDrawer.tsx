@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
 
 export interface SingleUseLinkData {
   title: string;
@@ -26,6 +27,7 @@ export default function SingleUseLinkDrawer({
     availability: false,
     host: false,
   });
+  const { user } = useAuth();
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({
@@ -60,14 +62,14 @@ export default function SingleUseLinkDrawer({
       />
 
       {/* Right Drawer */}
-      <div className="fixed right-0 top-0 w-full max-w-md h-screen z-50 bg-white shadow-2xl overflow-y-auto animate-in slide-in-from-right duration-300">
+      <div className="fixed right-0 top-0 w-full max-w-md h-screen z-50 bg-paper shadow-2xl overflow-y-auto animate-in slide-in-from-right duration-300">
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-slate-200 p-4 flex items-center justify-between">
+        <div className="sticky top-0 bg-paper border-b border-ink border-2 p-4 flex items-center justify-between">
           <div>
-            <div className="text-[12px] font-medium text-slate-500 mb-1">Create</div>
+            <div className="text-[12px] font-medium font-medium text-ink/60 mb-1">Create</div>
             <div className="flex items-center gap-2">
-              <div className="h-5 w-5 rounded-full bg-blue-500" />
-              <h2 className="text-[18px] font-bold text-slate-900">
+              <div className="h-5 w-5 rounded-sm bg-blue-500" />
+              <h2 className="text-[18px] font-bold text-ink">
                 One-off meeting
               </h2>
             </div>
@@ -75,24 +77,24 @@ export default function SingleUseLinkDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600"
+            className="p-2 hover:bg-clay/10 rounded-sm transition-colors text-ink/70"
             aria-label="Close drawer"
           >
-            <span className="material-symbols-outlined text-[20px]">close</span>
+            <span className="material-symbols-outlined text-[20px] font-display font-semibold tracking-wide">close</span>
           </button>
         </div>
 
         {/* Content */}
         <form id="single-use-link-drawer-form" onSubmit={handleSubmit} className="p-4 space-y-0">
           {/* Duration Section */}
-          <div className="border-b border-slate-200">
+          <div className="border-b border-ink border-2">
             <button
               type="button"
               onClick={() => toggleSection('duration')}
               className="w-full flex items-center justify-between py-3 px-2 text-left"
             >
-              <span className="text-[14px] font-bold text-slate-900">Duration</span>
-              <span className="material-symbols-outlined text-[20px] text-slate-600">
+              <span className="text-[14px] font-display font-semibold tracking-wide font-bold text-ink">Duration</span>
+              <span className="material-symbols-outlined text-[20px] font-display font-semibold tracking-wide text-ink/70">
                 {expandedSections.duration ? 'expand_less' : 'expand_more'}
               </span>
             </button>
@@ -100,11 +102,11 @@ export default function SingleUseLinkDrawer({
             {expandedSections.duration && (
               <div className="pb-3 px-2">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="material-symbols-outlined text-[18px] text-slate-500">schedule</span>
+                  <span className="material-symbols-outlined text-[18px] text-ink/60">schedule</span>
                   <select
                     name="duration"
                     defaultValue="30"
-                    className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-primary"
+                    className="flex-1 px-3 py-2 border-2 border-ink rounded-sm text-[13px] font-medium focus:outline-none focus:border-stamp border-2"
                   >
                     <option value="15">15 min</option>
                     <option value="30">30 min</option>
@@ -117,14 +119,14 @@ export default function SingleUseLinkDrawer({
           </div>
 
           {/* Location Section */}
-          <div className="border-b border-slate-200">
+          <div className="border-b border-ink border-2">
             <button
               type="button"
               onClick={() => toggleSection('location')}
               className="w-full flex items-center justify-between py-3 px-2 text-left"
             >
-              <span className="text-[14px] font-bold text-slate-900">Location</span>
-              <span className="material-symbols-outlined text-[20px] text-slate-600">
+              <span className="text-[14px] font-display font-semibold tracking-wide font-bold text-ink">Location</span>
+              <span className="material-symbols-outlined text-[20px] font-display font-semibold tracking-wide text-ink/70">
                 {expandedSections.location ? 'expand_less' : 'expand_more'}
               </span>
             </button>
@@ -134,27 +136,27 @@ export default function SingleUseLinkDrawer({
                 <div className="flex gap-2 mb-2">
                   <button
                     type="button"
-                    className="flex-1 py-2 px-3 rounded-lg border border-slate-200 text-[13px] font-medium text-slate-600 hover:bg-slate-50"
+                    className="flex-1 py-2 px-3 rounded-sm border-2 border-ink text-[13px] font-medium font-medium text-ink/70 hover:bg-clay/5"
                   >
                     <span className="material-symbols-outlined inline text-[18px]">videocam</span>
-                    <div className="text-[12px]">Zoom</div>
+                    <div className="text-[12px] font-medium">Zoom</div>
                   </button>
                   <button
                     type="button"
-                    className="flex-1 py-2 px-3 rounded-lg border border-slate-200 text-[13px] font-medium text-slate-600 hover:bg-slate-50"
+                    className="flex-1 py-2 px-3 rounded-sm border-2 border-ink text-[13px] font-medium font-medium text-ink/70 hover:bg-clay/5"
                   >
                     <span className="material-symbols-outlined inline text-[18px]">phone</span>
-                    <div className="text-[12px]">Phone</div>
+                    <div className="text-[12px] font-medium">Phone</div>
                   </button>
                   <button
                     type="button"
-                    className="flex-1 py-2 px-3 rounded-lg border border-slate-200 text-[13px] font-medium text-slate-600 hover:bg-slate-50"
+                    className="flex-1 py-2 px-3 rounded-sm border-2 border-ink text-[13px] font-medium font-medium text-ink/70 hover:bg-clay/5"
                   >
                     <span className="material-symbols-outlined inline text-[18px]">location_on</span>
-                    <div className="text-[12px]">In-person</div>
+                    <div className="text-[12px] font-medium">In-person</div>
                   </button>
                 </div>
-                <div className="text-[12px] text-slate-500">
+                <div className="text-[12px] font-medium text-ink/60">
                   <span className="material-symbols-outlined inline text-[16px]">info</span>
                   No location set
                 </div>
@@ -163,21 +165,21 @@ export default function SingleUseLinkDrawer({
           </div>
 
           {/* Availability Section */}
-          <div className="border-b border-slate-200">
+          <div className="border-b border-ink border-2">
             <button
               type="button"
               onClick={() => toggleSection('availability')}
               className="w-full flex items-center justify-between py-3 px-2 text-left"
             >
-              <span className="text-[14px] font-bold text-slate-900">Availability</span>
-              <span className="material-symbols-outlined text-[20px] text-slate-600">
+              <span className="text-[14px] font-display font-semibold tracking-wide font-bold text-ink">Availability</span>
+              <span className="material-symbols-outlined text-[20px] font-display font-semibold tracking-wide text-ink/70">
                 {expandedSections.availability ? 'expand_less' : 'expand_more'}
               </span>
             </button>
 
             {expandedSections.availability && (
               <div className="pb-3 px-2">
-                <div className="text-[13px] font-medium text-slate-700 mb-2">
+                <div className="text-[13px] font-medium font-medium text-ink/80 mb-2">
                   Weekdays, 9 am - 5 pm
                 </div>
               </div>
@@ -185,23 +187,25 @@ export default function SingleUseLinkDrawer({
           </div>
 
           {/* Host Section */}
-          <div className="border-b border-slate-200">
+          <div className="border-b border-ink border-2">
             <button
               type="button"
               onClick={() => toggleSection('host')}
               className="w-full flex items-center justify-between py-3 px-2 text-left"
             >
-              <span className="text-[14px] font-bold text-slate-900">Host</span>
-              <span className="material-symbols-outlined text-[20px] text-slate-600">
+              <span className="text-[14px] font-display font-semibold tracking-wide font-bold text-ink">Host</span>
+              <span className="material-symbols-outlined text-[20px] font-display font-semibold tracking-wide text-ink/70">
                 {expandedSections.host ? 'expand_less' : 'expand_more'}
               </span>
             </button>
 
             {expandedSections.host && (
               <div className="pb-3 px-2">
-                <div className="flex items-center gap-2 text-[13px] font-medium text-slate-700">
-                  <div className="h-5 w-5 rounded-full bg-slate-200" />
-                  OM (you)
+                <div className="flex items-center gap-2 text-[13px] font-medium font-medium text-ink/80">
+                  <div className="h-5 w-5 rounded-sm bg-clay/20 flex items-center justify-center text-[10px] font-bold text-ink/70">
+                    {user?.name ? user.name.slice(0, 2).toUpperCase() : 'U'}
+                  </div>
+                  {user?.name || 'User'} (you)
                 </div>
               </div>
             )}
@@ -216,11 +220,11 @@ export default function SingleUseLinkDrawer({
         </form>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white border-t border-slate-200 p-4 flex items-center gap-3">
+        <div className="sticky bottom-0 bg-paper border-t border-ink border-2 p-4 flex items-center gap-3">
           <button
             type="submit"
             form="single-use-link-drawer-form"
-            className="w-full py-2 px-4 rounded-lg bg-primary text-[13px] font-bold text-white hover:opacity-90"
+            className="w-full py-2 px-4 rounded-sm bg-stamp text-[13px] font-medium font-bold text-paper hover:opacity-90"
           >
             Create
           </button>

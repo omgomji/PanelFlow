@@ -185,8 +185,12 @@ export const publicController = {
     const uid = req.params.uid as string;
     const booking = await bookingsService.getByUidRaw(uid);
 
-    const schedule = await publicService.getScheduleWithIntervals(booking.userId);
-    const effectiveTimezone = schedule?.timezone || booking.user.timezone;
+    // Panel bookings have no userId/user — use the first interviewer's schedule as fallback
+    const hostUserId = booking.userId ?? booking.panel?.interviewers?.[0]?.userId;
+    const schedule = hostUserId
+      ? await publicService.getScheduleWithIntervals(hostUserId)
+      : null;
+    const effectiveTimezone = schedule?.timezone || booking.user?.timezone || 'UTC';
 
     res.json({
       booking: {
@@ -198,11 +202,20 @@ export const publicController = {
         status: booking.status,
       },
       eventType: booking.eventType,
-      user: {
-        name: booking.user.name,
-        username: booking.user.username,
-        timezone: effectiveTimezone,
-      },
+      panel: booking.panel
+        ? {
+            title: booking.panel.title,
+            position: booking.panel.position,
+            interviewers: booking.panel.interviewers?.map((pi: any) => ({ name: pi.user.name })),
+          }
+        : undefined,
+      user: booking.user
+        ? {
+            name: booking.user.name,
+            username: booking.user.username,
+            timezone: effectiveTimezone,
+          }
+        : undefined,
     });
   },
 
@@ -225,7 +238,17 @@ export const publicController = {
     }
 
     const oldBooking = await bookingsService.getByUidRaw(uid);
-    const schedule = await publicService.getScheduleWithIntervals(oldBooking.userId);
+
+    // For panel bookings, userId is null — delegate slot validation to panelSlotsService
+    if (oldBooking.panelId) {
+      const newBooking = await bookingsService.reschedulePublicBooking(
+        uid,
+        startDate.toISOString()
+      );
+      return res.status(201).json(newBooking);
+    }
+
+    const schedule = await publicService.getScheduleWithIntervals(oldBooking.userId!);
 
     if (!schedule) {
       throw new ConflictError('This time slot is no longer available');
@@ -240,8 +263,8 @@ export const publicController = {
       : schedule.afterEventBufferMinutes;
       
     const generatedSlots = await generateSlots(
-      oldBooking.userId,
-      oldBooking.eventType.duration,
+      oldBooking.userId!,
+      oldBooking.eventType!.duration,
       schedule.timezone,
       schedule.days,
       schedule.dateOverrides,

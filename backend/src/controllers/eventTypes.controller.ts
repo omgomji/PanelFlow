@@ -11,14 +11,14 @@ import { BadRequestError } from '../utils/errors';
 export const eventTypesController = {
   /** GET /api/event-types */
   async getAll(req: Request, res: Response) {
-    const userId = (req as any).user.id;
+    const userId = req.user!.id;
     const eventTypes = await eventTypesService.findAllByUser(userId);
     res.json(eventTypes);
   },
 
   /** POST /api/event-types */
   async create(req: Request, res: Response) {
-    const userId = (req as any).user.id;
+    const userId = req.user!.id;
     const { title, slug, duration, description, isActive } = req.body;
 
     // Validation: required fields
@@ -38,7 +38,7 @@ export const eventTypesController = {
 
   /** PUT /api/event-types/:id */
   async update(req: Request, res: Response) {
-    const userId = (req as any).user.id;
+    const userId = req.user!.id;
     const id = Number(req.params.id);
 
     if (isNaN(id)) {
@@ -58,7 +58,7 @@ export const eventTypesController = {
 
   /** DELETE /api/event-types/:id */
   async remove(req: Request, res: Response) {
-    const userId = (req as any).user.id;
+    const userId = req.user!.id;
     const id = Number(req.params.id);
 
     if (isNaN(id)) {

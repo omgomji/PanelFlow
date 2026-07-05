@@ -19,6 +19,9 @@
  *   4. Past slots are filtered out (slot must start after NOW in UTC).
  *
  *   5. Optional before/after event buffers are applied when checking overlaps.
+ *
+ *   6. Busy-time is now queried from BookingHost (not Booking directly) so that
+ *      panel booking commitments are reflected in individual slot generation.
  */
 import { addMinutes, subMinutes } from 'date-fns';
 import { fromZonedTime, formatInTimeZone } from 'date-fns-tz';
@@ -54,6 +57,115 @@ function toUtcFromLocalTime(
   }
 
   return utcDate;
+}
+
+/**
+ * Returns the free UTC intervals for a given user on a given date,
+ * already accounting for their weekly rules, date overrides, buffers,
+ * and existing busy time (queried from BookingHost so both individual
+ * and panel commitments are reflected).
+ *
+ * This is the shared helper used by both individual slot generation
+ * and the panel intersection engine in panelSlots.service.ts.
+ */
+export async function getFreeIntervalsForUser(
+  userId: number,
+  date: string, // YYYY-MM-DD in the user's local timezone
+  options?: {
+    scheduleTimezone?: string;
+    beforeEventBufferMinutes?: number;
+    afterEventBufferMinutes?: number;
+    allowBackToBack?: boolean;
+  }
+): Promise<{ start: Date; end: Date }[]> {
+  const schedule = await prisma.availabilitySchedule.findUnique({
+    where: { userId },
+    include: {
+      days: {
+        include: { intervals: { orderBy: { order: 'asc' } } },
+        orderBy: { dayOfWeek: 'asc' },
+      },
+      dateOverrides: {
+        include: { intervals: { orderBy: { order: 'asc' } } },
+        orderBy: { date: 'asc' },
+      },
+    },
+  });
+
+  if (!schedule) return [];
+
+  const scheduleTimezone = options?.scheduleTimezone ?? schedule.timezone;
+  const allowBackToBack = options?.allowBackToBack ?? schedule.allowBackToBack ?? true;
+  const beforeEventBufferMinutes = allowBackToBack
+    ? 0
+    : Math.max(0, options?.beforeEventBufferMinutes ?? schedule.beforeEventBufferMinutes ?? 0);
+  const afterEventBufferMinutes = allowBackToBack
+    ? 0
+    : Math.max(0, options?.afterEventBufferMinutes ?? schedule.afterEventBufferMinutes ?? 0);
+  const totalBufferWindowMinutes = beforeEventBufferMinutes + afterEventBufferMinutes;
+
+  // Determine day-of-week in the user's timezone
+  const targetDateMidnight = fromZonedTime(`${date}T00:00:00`, scheduleTimezone);
+  const isoDayOfWeek = parseInt(
+    formatInTimeZone(targetDateMidnight, scheduleTimezone, 'i'),
+    10
+  );
+  const dayOfWeek = isoDayOfWeek % 7;
+
+  // Resolve date-specific override or fall back to weekly rule
+  const dateOverride = schedule.dateOverrides.find(
+    (override) => toYyyyMmDd(override.date) === date
+  );
+  if (dateOverride && dateOverride.intervals.length === 0) return [];
+
+  const availableDay = schedule.days.find((d) => d.dayOfWeek === dayOfWeek);
+  const effectiveIntervals = dateOverride?.intervals ?? availableDay?.intervals ?? [];
+  if (effectiveIntervals.length === 0) return [];
+
+  // Convert host-local interval bounds to UTC
+  const utcIntervals = effectiveIntervals.map((interval) => ({
+    startUtc: toUtcFromLocalTime(date, interval.startTime, scheduleTimezone),
+    endUtc: toUtcFromLocalTime(date, interval.endTime, scheduleTimezone),
+  }));
+
+  const windowStartUtc = utcIntervals[0].startUtc;
+  const windowEndUtc = utcIntervals[utcIntervals.length - 1].endUtc;
+  const conflictWindowStartUtc = subMinutes(windowStartUtc, totalBufferWindowMinutes);
+  const conflictWindowEndUtc = addMinutes(windowEndUtc, totalBufferWindowMinutes);
+
+  // Query busy time from BookingHost — catches both individual and panel commitments.
+  const busyBlocks = await prisma.bookingHost.findMany({
+    where: {
+      userId,
+      status: 'SCHEDULED',
+      startTime: { lt: conflictWindowEndUtc },
+      endTime: { gt: conflictWindowStartUtc },
+    },
+    select: { startTime: true, endTime: true },
+  });
+
+  // Return UTC intervals with busy blocks carved out
+  const freeIntervals: { start: Date; end: Date }[] = [];
+  for (const interval of utcIntervals) {
+    // Start with the full interval, then subtract busy blocks
+    let free: { start: Date; end: Date }[] = [{ start: interval.startUtc, end: interval.endUtc }];
+
+    for (const busy of busyBlocks) {
+      const busyStart = subMinutes(busy.startTime, beforeEventBufferMinutes);
+      const busyEnd = addMinutes(busy.endTime, afterEventBufferMinutes);
+
+      free = free.flatMap((f) => {
+        if (busyEnd <= f.start || busyStart >= f.end) return [f]; // no overlap
+        const before = busyStart > f.start ? [{ start: f.start, end: busyStart }] : [];
+        const after = busyEnd < f.end ? [{ start: busyEnd, end: f.end }] : [];
+        return [...before, ...after];
+      });
+    }
+
+    freeIntervals.push(...free);
+  }
+
+  return freeIntervals;
 }
 
 export async function generateSlots(
@@ -142,10 +254,9 @@ export async function generateSlots(
   const conflictWindowStartUtc = subMinutes(windowStartUtc, totalBufferWindowMinutes);
   const conflictWindowEndUtc = addMinutes(windowEndUtc, totalBufferWindowMinutes);
 
-  // ── Step 4: Load existing bookings for overlap check ───────
-  // Scoped to USER (not event type) — prevents cross-event-type conflicts.
-  // Uses the direct userId on bookings (denormalised for this exact query).
-  const existingBookings = await prisma.booking.findMany({
+  // ── Step 4: Load existing busy time for overlap check ──────
+  // Now queries BookingHost — catches both individual and panel commitments.
+  const existingBookings = await prisma.bookingHost.findMany({
     where: {
       userId,
       status: 'SCHEDULED',

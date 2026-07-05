@@ -34,27 +34,27 @@ export default function UserLandingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+      <div className="min-h-screen bg-clay/5 flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-sm border-b-2 border-stamp border-2" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-clay/5 flex items-center justify-center">
         <div className="text-red-500 font-medium">{error}</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-clay/5">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200">
+      <div className="bg-paper border-b border-ink border-2">
         <div className="max-w-4xl mx-auto px-4 py-4">
-          <span className="text-[12px] font-medium text-slate-500 uppercase tracking-wide">
-            CalClo
+          <span className="text-[12px] font-medium font-medium text-ink/60 uppercase tracking-wide">
+            PanelFlow
           </span>
         </div>
       </div>
@@ -63,8 +63,8 @@ export default function UserLandingPage() {
       <div className="max-w-4xl mx-auto px-4 py-8 sm:py-12">
         {/* Username Header */}
         <div className="mb-8">
-          <h1 className="text-[32px] font-bold text-slate-900 sm:text-[40px] lg:text-[48px]">{userData?.name || username}</h1>
-          <p className="mt-3 max-w-2xl text-[15px] text-slate-600 sm:text-[16px]">
+          <h1 className="text-[32px] font-bold text-ink sm:text-[40px] lg:text-[48px]">{userData?.name || username}</h1>
+          <p className="mt-3 max-w-2xl text-[15px] text-ink/70 sm:text-[16px]">
             Welcome to my scheduling page. Please follow the instructions to add an event to my calendar.
           </p>
         </div>
@@ -73,26 +73,26 @@ export default function UserLandingPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {eventTypes.map((event) => (
             <Link key={event.id} href={`/${username}/${event.slug}`}>
-              <div className="bg-white rounded-lg border border-slate-200 p-6 hover:shadow-lg transition-shadow cursor-pointer group">
+              <div className="bg-paper rounded-sm border-2 border-ink p-6 hover: transition-shadow cursor-pointer group">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3 flex-1">
-                    <div className="h-6 w-6 rounded-full bg-purple-500 flex-shrink-0 mt-1" />
+                    <div className="h-6 w-6 rounded-sm bg-purple-500 flex-shrink-0 mt-1" />
                     <div>
-                      <h3 className="text-[18px] font-bold text-slate-900 group-hover:text-primary transition-colors">
+                      <h3 className="text-[18px] font-bold text-ink group-hover:text-stamp transition-colors">
                         {event.title}
                       </h3>
                     </div>
                   </div>
-                  <span className="material-symbols-outlined text-slate-400 group-hover:text-slate-600 transition-colors">
+                  <span className="material-symbols-outlined text-ink/50 group-hover:text-ink/70 transition-colors">
                     chevron_right
                   </span>
                 </div>
                 {event.description && (
-                  <p className="text-[14px] text-slate-600 mt-2 ml-9">
+                  <p className="text-[14px] font-display font-semibold tracking-wide text-ink/70 mt-2 ml-9">
                     {event.description}
                   </p>
                 )}
-                <div className="flex items-center gap-1 text-[13px] text-slate-500 mt-3 ml-9">
+                <div className="flex items-center gap-1 text-[13px] font-medium text-ink/60 mt-3 ml-9">
                   <span className="material-symbols-outlined text-[16px]">schedule</span>
                   {event.duration} min
                 </div>
@@ -102,14 +102,14 @@ export default function UserLandingPage() {
         </div>
 
         {eventTypes.length === 0 && (
-          <div className="bg-white rounded-lg border border-slate-200 p-12 text-center">
-            <p className="text-slate-600">No event types available</p>
+          <div className="bg-paper rounded-sm border-2 border-ink p-12 text-center">
+            <p className="text-ink/70">No event types available</p>
           </div>
         )}
       </div>
 
       {/* Footer */}
-      <div className="mt-12 py-6 border-t border-slate-200 text-center text-[12px] text-slate-500">
+      <div className="mt-12 py-6 border-t border-ink border-2 text-center text-[12px] font-medium text-ink/60">
       </div>
     </div>
   );

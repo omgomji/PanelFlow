@@ -10,5 +10,8 @@
     "types": ["node"],
     "lib": ["ESNext"]
   },
-  "include": ["src/**/*", "prisma/**/*"]
+  "include": ["src/**/*", "prisma/**/*"],
+  "ts-node": {
+    "files": true
+  }
 }

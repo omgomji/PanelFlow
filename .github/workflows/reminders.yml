@@ -1,0 +1,11 @@
+name: Send Booking Reminders
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -X POST "${{ secrets.BACKEND_URL }}/api/cron/send-reminders" \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}"

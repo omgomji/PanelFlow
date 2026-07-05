@@ -33,11 +33,27 @@ function cleanOptionalText(value: unknown): string | undefined {
 
 export const contactsService = {
   /** Return all contacts owned by a user. */
-  async findAllByUser(userId: number) {
-    return prisma.contact.findMany({
-      where: { userId },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    });
+  async findAllByUser(userId: number, page: number = 1, limit: number = 10) {
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      prisma.contact.findMany({
+        where: { userId },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip,
+        take: limit,
+      }),
+      prisma.contact.count({ where: { userId } }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   },
 
   /** Create a new contact with user-scoped email dedupe. */

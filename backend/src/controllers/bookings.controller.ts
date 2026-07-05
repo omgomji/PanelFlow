@@ -12,7 +12,7 @@ import { generateBookingsCsv } from '../utils/csv.utils';
 export const bookingsController = {
   /** GET /api/bookings?status=upcoming|past */
   async getAll(req: Request, res: Response) {
-    const userId = (req as any).user.id;
+    const userId = req.user!.id;
     const status = req.query.status as string | undefined;
     const from = req.query.from as string | undefined;
     const to = req.query.to as string | undefined;
@@ -32,19 +32,32 @@ export const bookingsController = {
       throw new BadRequestError('Invalid to date');
     }
 
-    const bookings = await bookingsService.findByUser(userId, {
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string) || 10));
+
+    const result = await bookingsService.findByUser(userId, {
       status,
       from,
       to,
       q,
       eventTypeId,
+      page,
+      limit,
     });
+    res.json(result);
+  },
+
+  /** GET /api/bookings/hosted — bookings where caller is a BookingHost */
+  async getHosted(req: Request, res: Response) {
+    const userId = req.user!.id;
+    const status = req.query.status as string | undefined;
+    const bookings = await bookingsService.findHosted(userId, status);
     res.json(bookings);
   },
 
   /** GET /api/bookings/export */
   async exportCsv(req: Request, res: Response) {
-    const userId = (req as any).user.id;
+    const userId = req.user!.id;
     const status = req.query.status as string | undefined;
     const from = req.query.from as string | undefined;
     const to = req.query.to as string | undefined;
@@ -72,14 +85,28 @@ export const bookingsController = {
 
   /** POST /api/bookings/:id/cancel */
   async cancel(req: Request, res: Response) {
-    const userId = (req as any).user.id;
+    const userId = req.user!.id;
+    const id = Number(req.params.id);
+    const { cancellationReason } = req.body;
+
+    if (isNaN(id)) {
+      throw new BadRequestError('Invalid booking ID');
+    }
+
+    const booking = await bookingsService.cancel(userId, id, cancellationReason);
+    res.json(booking);
+  },
+
+  /** PATCH /api/bookings/:id/no-show */
+  async noShow(req: Request, res: Response) {
+    const userId = req.user!.id;
     const id = Number(req.params.id);
 
     if (isNaN(id)) {
       throw new BadRequestError('Invalid booking ID');
     }
 
-    const booking = await bookingsService.cancel(userId, id);
+    const booking = await bookingsService.markNoShow(userId, id);
     res.json(booking);
   },
 };

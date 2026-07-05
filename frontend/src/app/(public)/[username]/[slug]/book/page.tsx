@@ -6,6 +6,7 @@ import axios from 'axios';
 import { createBooking, getPublicEventDetails } from '@/lib/api';
 import { formatInTimeZone } from 'date-fns-tz';
 import type { PublicEventData } from '@/types/public';
+import { AlertDialog } from '@/components/ui/AlertDialog';
 
 export default function BookingDetailsPage() {
   const { username, slug } = useParams<{ username: string; slug: string }>();
@@ -19,12 +20,19 @@ export default function BookingDetailsPage() {
   const [eventData, setEventData] = useState<PublicEventData | null>(null);
   const [error, setError] = useState('');
 
+  const [alertInfo, setAlertInfo] = useState({ isOpen: false, title: '', message: '' });
+  const showAlert = (title: string, message: string) => setAlertInfo({ isOpen: true, title, message });
+  const closeAlert = () => setAlertInfo(prev => ({ ...prev, isOpen: false }));
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const hostTimeZone = eventData?.user?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const [inviteeTimeZone, setInviteeTimeZone] = useState('UTC');
+  useEffect(() => {
+    setInviteeTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  }, []);
 
   useEffect(() => {
     const fetchEventData = async () => {
@@ -50,7 +58,7 @@ export default function BookingDetailsPage() {
 
     const selectedStartTime = timeParam;
     if (!selectedStartTime) {
-      alert('Invalid booking details');
+      showAlert('Error', 'Invalid booking details');
       setSubmitting(false);
       return;
     }
@@ -65,11 +73,12 @@ export default function BookingDetailsPage() {
 
       const query = new URLSearchParams({
         bookingId: String(booking.id),
+        uid: booking.uid,
         startTime: String(booking.startTime),
         endTime: String(booking.endTime),
         inviteeName: name,
         inviteeEmail: email,
-        timezone: hostTimeZone,
+        timezone: inviteeTimeZone,
       });
 
       router.push(`/${username}/${slug}/success?${query.toString()}`);
@@ -77,12 +86,12 @@ export default function BookingDetailsPage() {
       console.error('Error booking:', err);
 
       if (axios.isAxiosError(err) && err.response?.status === 409) {
-        alert('This slot was just booked by someone else. Please choose another time.');
+        showAlert('Error', 'This slot was just booked by someone else. Please choose another time.');
         router.replace(`/${username}/${slug}`);
         return;
       }
 
-      alert('Failed to book meeting. Please try again.');
+      showAlert('Error', 'Failed to book meeting. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -90,15 +99,15 @@ export default function BookingDetailsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+      <div className="min-h-screen bg-clay/5 flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-sm border-b-2 border-stamp border-2" />
       </div>
     );
   }
 
   if (error || !eventData || !dateParam || !timeParam) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-clay/5 flex items-center justify-center">
         <div className="text-red-500 font-medium">{error || 'Invalid booking details'}</div>
       </div>
     );
@@ -108,62 +117,62 @@ export default function BookingDetailsPage() {
   const selectedTime = new Date(timeParam);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-clay/5">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200">
+      <div className="bg-paper border-b border-ink border-2">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <span className="text-[12px] font-medium text-slate-500 uppercase">CalClo</span>
+          <span className="text-[12px] font-medium font-medium text-ink/60 uppercase">PanelFlow</span>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="max-w-5xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-200">
+        <div className="bg-paper rounded-sm border-2 border-ink overflow-hidden shadow-200">
           <div className="grid grid-cols-1 md:grid-cols-3 md:min-h-[600px] relative">
             {/* Left Panel - Event Details */}
-            <div className="border-b border-slate-200 p-4 sm:p-6 md:border-b-0 md:border-r">
+            <div className="border-b border-ink border-2 p-4 sm:p-6 md:border-b-0 md:border-r">
               <button
                 onClick={() => router.back()}
-                className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-slate-100"
+                className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-sm transition-colors hover:bg-clay/10"
               >
-                <span className="material-symbols-outlined text-[20px] text-primary">arrow_back</span>
+                <span className="material-symbols-outlined text-[20px] font-display font-semibold tracking-wide text-stamp">arrow_back</span>
               </button>
 
-              <div className="text-[12px] font-medium text-slate-500 uppercase tracking-wide mb-1">
+              <div className="text-[12px] font-medium font-medium text-ink/60 uppercase tracking-wide mb-1">
                 {user.name}
               </div>
-              <h1 className="text-[28px] font-bold text-slate-900 mb-4">{eventType.title}</h1>
+              <h1 className="text-[28px] font-bold text-ink mb-4">{eventType.title}</h1>
 
               <div className="flex items-center gap-2 mb-2">
-                <span className="material-symbols-outlined text-[18px] text-slate-500">schedule</span>
-                <span className="text-[14px] font-medium text-slate-700">{eventType.duration} min</span>
+                <span className="material-symbols-outlined text-[18px] text-ink/60">schedule</span>
+                <span className="text-[14px] font-display font-semibold tracking-wide font-medium text-ink/80">{eventType.duration} min</span>
               </div>
 
-              <div className="mt-6 space-y-3 text-[13px]">
+              <div className="mt-6 space-y-3 text-[13px] font-medium">
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[18px] text-slate-500">event</span>
-                  <span className="text-slate-700 font-medium">
-                    {formatInTimeZone(selectedTime, hostTimeZone, 'h:mma')} - {formatInTimeZone(new Date(selectedTime.getTime() + eventType.duration * 60000), hostTimeZone, 'h:mma')}, {formatInTimeZone(selectedTime, hostTimeZone, 'EEEE, MMMM d, yyyy')}
+                  <span className="material-symbols-outlined text-[18px] text-ink/60">event</span>
+                  <span className="text-ink/80 font-medium">
+                    {formatInTimeZone(selectedTime, inviteeTimeZone, 'h:mma')} - {formatInTimeZone(new Date(selectedTime.getTime() + eventType.duration * 60000), inviteeTimeZone, 'h:mma')}, {formatInTimeZone(selectedTime, inviteeTimeZone, 'EEEE, MMMM d, yyyy')}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[18px] text-slate-500">public</span>
-                  <span className="text-slate-700 font-medium">{hostTimeZone}</span>
+                  <span className="material-symbols-outlined text-[18px] text-ink/60">public</span>
+                  <span className="text-ink/80 font-medium">{inviteeTimeZone}</span>
                 </div>
               </div>
 
-              <div className="mt-8 pt-6 border-t border-slate-200">
+              <div className="mt-8 pt-6 border-t border-ink border-2">
               </div>
             </div>
 
             {/* Right Panel - Form */}
             <div className="p-4 sm:p-6 md:col-span-2">
-              <h2 className="text-[18px] font-bold text-slate-900 mb-6">Enter Details</h2>
+              <h2 className="text-[18px] font-bold text-ink mb-6">Enter Details</h2>
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 {/* Name */}
                 <div>
-                  <label className="block text-[13px] font-bold text-slate-900 mb-2">
+                  <label className="block text-[13px] font-medium font-bold text-ink mb-2">
                     Name <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -171,14 +180,14 @@ export default function BookingDetailsPage() {
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg text-[14px] focus:outline-none focus:border-primary"
+                    className="w-full px-4 py-2 border-2 border-ink rounded-sm text-[14px] font-display font-semibold tracking-wide focus:outline-none focus:border-stamp border-2"
                     placeholder="Your name"
                   />
                 </div>
 
                 {/* Email */}
                 <div>
-                  <label className="block text-[13px] font-bold text-slate-900 mb-2">
+                  <label className="block text-[13px] font-medium font-bold text-ink mb-2">
                     Email <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -186,7 +195,7 @@ export default function BookingDetailsPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg text-[14px] focus:outline-none focus:border-primary"
+                    className="w-full px-4 py-2 border-2 border-ink rounded-sm text-[14px] font-display font-semibold tracking-wide focus:outline-none focus:border-stamp border-2"
                     placeholder="your@email.com"
                   />
                 </div>
@@ -195,7 +204,7 @@ export default function BookingDetailsPage() {
                 <div>
                   <button
                     type="button"
-                    className="inline-flex h-10 items-center rounded-full border border-primary px-4 text-[12px] font-bold text-primary transition-colors hover:bg-primary hover:text-white"
+                    className="inline-flex h-10 items-center rounded-sm border border-stamp border-2 px-4 text-[12px] font-medium font-bold text-stamp transition-colors hover:bg-stamp hover:text-paper"
                   >
                     Add Guests
                   </button>
@@ -203,26 +212,26 @@ export default function BookingDetailsPage() {
 
                 {/* Notes */}
                 <div>
-                  <label className="block text-[13px] font-bold text-slate-900 mb-2">
+                  <label className="block text-[13px] font-medium font-bold text-ink mb-2">
                     Please share anything that will help prepare for our meeting.
                   </label>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg text-[14px] focus:outline-none focus:border-primary"
+                    className="w-full px-4 py-2 border-2 border-ink rounded-sm text-[14px] font-display font-semibold tracking-wide focus:outline-none focus:border-stamp border-2"
                     rows={4}
                     placeholder="Additional notes..."
                   />
                 </div>
 
                 {/* Terms */}
-                <div className="text-[12px] text-slate-600">
-                  By proceeding, you confirm that you have read and agree to CalClo&apos;s{' '}
-                  <button type="button" className="text-primary font-bold hover:underline">
+                <div className="text-[12px] font-medium text-ink/70">
+                  By proceeding, you confirm that you have read and agree to PanelFlow&apos;s{' '}
+                  <button type="button" className="text-stamp font-bold hover:underline">
                     Terms of Use
                   </button>
                   {' '}and{' '}
-                  <button type="button" className="text-primary font-bold hover:underline">
+                  <button type="button" className="text-stamp font-bold hover:underline">
                     Privacy Notice
                   </button>
                   .
@@ -233,7 +242,7 @@ export default function BookingDetailsPage() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="min-h-11 w-full rounded-full bg-primary px-4 py-2 text-[14px] font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="min-h-11 w-full rounded-sm bg-stamp px-4 py-2 text-[14px] font-display font-semibold tracking-wide font-bold text-paper transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {submitting ? 'Scheduling...' : 'Schedule Event'}
                   </button>
@@ -243,6 +252,13 @@ export default function BookingDetailsPage() {
           </div>
         </div>
       </div>
+
+      <AlertDialog
+        isOpen={alertInfo.isOpen}
+        title={alertInfo.title}
+        message={alertInfo.message}
+        onClose={closeAlert}
+      />
     </div>
   );
 }

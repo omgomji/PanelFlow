@@ -11,14 +11,16 @@ import { BadRequestError } from '../utils/errors';
 export const contactsController = {
   /** GET /api/contacts */
   async getAll(req: Request, res: Response) {
-    const userId = (req as any).user.id;
-    const contacts = await contactsService.findAllByUser(userId);
-    res.json(contacts);
+    const userId = req.user!.id;
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string) || 10));
+    const result = await contactsService.findAllByUser(userId, page, limit);
+    res.json(result);
   },
 
   /** POST /api/contacts */
   async create(req: Request, res: Response) {
-    const userId = (req as any).user.id;
+    const userId = req.user!.id;
     const { name, email, phone, note } = req.body;
 
     if (!name || !email) {
@@ -37,7 +39,7 @@ export const contactsController = {
 
   /** PUT /api/contacts/:id */
   async update(req: Request, res: Response) {
-    const userId = (req as any).user.id;
+    const userId = req.user!.id;
     const id = Number(req.params.id);
     const { name, email, phone, note } = req.body;
 
@@ -57,7 +59,7 @@ export const contactsController = {
 
   /** DELETE /api/contacts/:id */
   async remove(req: Request, res: Response) {
-    const userId = (req as any).user.id;
+    const userId = req.user!.id;
     const id = Number(req.params.id);
 
     if (isNaN(id)) {

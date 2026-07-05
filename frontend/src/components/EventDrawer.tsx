@@ -97,13 +97,13 @@ export default function EventDrawer({
       />
 
       {/* Right Drawer */}
-      <div className="fixed right-0 top-0 w-full max-w-md h-screen z-50 bg-white shadow-2xl overflow-y-auto">
+      <div className="fixed right-0 top-0 w-full max-w-md h-screen z-50 bg-paper shadow-2xl overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-slate-200 p-4 flex items-center justify-between">
+        <div className="sticky top-0 bg-paper border-b border-ink border-2 p-4 flex items-center justify-between">
           <div className="flex-1 min-w-0">
-            <div className="text-[12px] font-medium text-slate-500 mb-1">Event type</div>
+            <div className="text-[12px] font-medium font-medium text-ink/60 mb-1">Event type</div>
             <div className="flex items-center gap-2">
-              <div className="h-5 w-5 rounded-full bg-purple-500 shrink-0" />
+              <div className="h-5 w-5 rounded-sm bg-purple-500 shrink-0" />
               <input
                 id="event-title"
                 type="text"
@@ -111,7 +111,7 @@ export default function EventDrawer({
                 value={title}
                 onChange={(e) => handleTitleChange(e.target.value)}
                 placeholder="New meeting"
-                className="w-full bg-transparent text-[18px] font-bold text-slate-900 outline-none placeholder:text-slate-300"
+                className="w-full bg-transparent text-[18px] font-bold text-ink outline-none placeholder:text-clay/50"
                 aria-label="Meeting name"
               />
             </div>
@@ -119,10 +119,10 @@ export default function EventDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="ml-3 p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600 shrink-0"
+            className="ml-3 p-2 hover:bg-clay/10 rounded-sm transition-colors text-ink/70 shrink-0"
             aria-label="Close drawer"
           >
-            <span className="material-symbols-outlined text-[20px]">close</span>
+            <span className="material-symbols-outlined text-[20px] font-display font-semibold tracking-wide">close</span>
           </button>
         </div>
 
@@ -130,10 +130,10 @@ export default function EventDrawer({
         <form id="event-drawer-form" onSubmit={handleSubmit} className="p-4 space-y-0">
           
           {/* Slug field */}
-          <div className="border-b border-slate-200 py-3 px-2">
-            <label className="block text-[12px] font-semibold text-slate-600 mb-1">URL Slug</label>
-            <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 overflow-hidden">
-              <span className="px-2 py-2 text-[12px] text-slate-400 border-r border-slate-200 whitespace-nowrap">
+          <div className="border-b border-ink border-2 py-3 px-2">
+            <label className="block text-[12px] font-medium font-bold text-ink/70 mb-1">URL Slug</label>
+            <div className="flex items-center rounded-sm border-2 border-ink bg-clay/5 overflow-hidden">
+              <span className="px-2 py-2 text-[12px] font-medium text-ink/50 border-r border-ink border-2 whitespace-nowrap">
                 /{'{'}username{'}'}/
               </span>
               <input
@@ -141,38 +141,38 @@ export default function EventDrawer({
                 value={slug}
                 onChange={(e) => handleSlugChange(e.target.value)}
                 placeholder="event-slug"
-                className="flex-1 bg-transparent px-2 py-2 text-[13px] text-slate-800 outline-none"
+                className="flex-1 bg-transparent px-2 py-2 text-[13px] font-medium text-ink/90 outline-none"
                 aria-label="URL Slug"
               />
             </div>
           </div>
 
           {/* Description */}
-          <div className="border-b border-slate-200 py-3 px-2">
-            <label className="block text-[12px] font-semibold text-slate-600 mb-1">Description</label>
+          <div className="border-b border-ink border-2 py-3 px-2">
+            <label className="block text-[12px] font-medium font-bold text-ink/70 mb-1">Description</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe what this meeting is for..."
               rows={3}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-800 outline-none focus:border-primary resize-none"
+              className="w-full rounded-sm border-2 border-ink bg-clay/5 px-3 py-2 text-[13px] font-medium text-ink/90 outline-none focus:border-stamp border-2 resize-none"
             />
           </div>
 
           {/* Duration Section */}
-          <div className="border-b border-slate-200">
+          <div className="border-b border-ink border-2">
             <button
               type="button"
               onClick={() => toggleSection('duration')}
               className="w-full flex items-center justify-between py-3 px-2 text-left"
             >
               <div>
-                <span className="text-[14px] font-bold text-slate-900">Duration</span>
+                <span className="text-[14px] font-display font-semibold tracking-wide font-bold text-ink">Duration</span>
                 {!expandedSections.duration && (
-                  <span className="ml-2 text-[13px] text-slate-500">{duration} min</span>
+                  <span className="ml-2 text-[13px] font-medium text-ink/60">{duration} min</span>
                 )}
               </div>
-              <span className="material-symbols-outlined text-[20px] text-slate-600">
+              <span className="material-symbols-outlined text-[20px] font-display font-semibold tracking-wide text-ink/70">
                 {expandedSections.duration ? 'expand_less' : 'expand_more'}
               </span>
             </button>
@@ -180,11 +180,11 @@ export default function EventDrawer({
             {expandedSections.duration && (
               <div className="pb-3 px-2">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="material-symbols-outlined text-[18px] text-slate-500">schedule</span>
+                  <span className="material-symbols-outlined text-[18px] text-ink/60">schedule</span>
                   <select
                     value={duration}
                     onChange={(e) => setDuration(Number(e.target.value))}
-                    className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-primary"
+                    className="flex-1 px-3 py-2 border-2 border-ink rounded-sm text-[13px] font-medium focus:outline-none focus:border-stamp border-2"
                   >
                     {DURATION_OPTIONS.map((d) => (
                       <option key={d} value={d}>{d} min</option>
@@ -196,14 +196,14 @@ export default function EventDrawer({
           </div>
 
           {/* Location Section */}
-          <div className="border-b border-slate-200">
+          <div className="border-b border-ink border-2">
             <button
               type="button"
               onClick={() => toggleSection('location')}
               className="w-full flex items-center justify-between py-3 px-2 text-left"
             >
-              <span className="text-[14px] font-bold text-slate-900">Location</span>
-              <span className="material-symbols-outlined text-[20px] text-slate-600">
+              <span className="text-[14px] font-display font-semibold tracking-wide font-bold text-ink">Location</span>
+              <span className="material-symbols-outlined text-[20px] font-display font-semibold tracking-wide text-ink/70">
                 {expandedSections.location ? 'expand_less' : 'expand_more'}
               </span>
             </button>
@@ -213,27 +213,27 @@ export default function EventDrawer({
                 <div className="flex gap-2 mb-2">
                   <button
                     type="button"
-                    className="flex-1 py-2 px-3 rounded-lg border border-slate-200 text-[13px] font-medium text-slate-600 hover:bg-slate-50"
+                    className="flex-1 py-2 px-3 rounded-sm border-2 border-ink text-[13px] font-medium font-medium text-ink/70 hover:bg-clay/5"
                   >
                     <span className="material-symbols-outlined inline text-[18px]">videocam</span>
-                    <div className="text-[12px]">Zoom</div>
+                    <div className="text-[12px] font-medium">Zoom</div>
                   </button>
                   <button
                     type="button"
-                    className="flex-1 py-2 px-3 rounded-lg border border-slate-200 text-[13px] font-medium text-slate-600 hover:bg-slate-50"
+                    className="flex-1 py-2 px-3 rounded-sm border-2 border-ink text-[13px] font-medium font-medium text-ink/70 hover:bg-clay/5"
                   >
                     <span className="material-symbols-outlined inline text-[18px]">phone</span>
-                    <div className="text-[12px]">Phone</div>
+                    <div className="text-[12px] font-medium">Phone</div>
                   </button>
                   <button
                     type="button"
-                    className="flex-1 py-2 px-3 rounded-lg border border-slate-200 text-[13px] font-medium text-slate-600 hover:bg-slate-50"
+                    className="flex-1 py-2 px-3 rounded-sm border-2 border-ink text-[13px] font-medium font-medium text-ink/70 hover:bg-clay/5"
                   >
                     <span className="material-symbols-outlined inline text-[18px]">location_on</span>
-                    <div className="text-[12px]">In-person</div>
+                    <div className="text-[12px] font-medium">In-person</div>
                   </button>
                 </div>
-                <div className="text-[12px] text-slate-500">
+                <div className="text-[12px] font-medium text-ink/60">
                   <span className="material-symbols-outlined inline text-[16px]">info</span>
                   No location set
                 </div>
@@ -242,21 +242,21 @@ export default function EventDrawer({
           </div>
 
           {/* Availability Section */}
-          <div className="border-b border-slate-200">
+          <div className="border-b border-ink border-2">
             <button
               type="button"
               onClick={() => toggleSection('availability')}
               className="w-full flex items-center justify-between py-3 px-2 text-left"
             >
-              <span className="text-[14px] font-bold text-slate-900">Availability</span>
-              <span className="material-symbols-outlined text-[20px] text-slate-600">
+              <span className="text-[14px] font-display font-semibold tracking-wide font-bold text-ink">Availability</span>
+              <span className="material-symbols-outlined text-[20px] font-display font-semibold tracking-wide text-ink/70">
                 {expandedSections.availability ? 'expand_less' : 'expand_more'}
               </span>
             </button>
 
             {expandedSections.availability && (
               <div className="pb-3 px-2">
-                <div className="text-[13px] font-medium text-slate-700 mb-2">
+                <div className="text-[13px] font-medium font-medium text-ink/80 mb-2">
                   Based on your availability schedule
                 </div>
               </div>
@@ -264,44 +264,44 @@ export default function EventDrawer({
           </div>
 
           {/* Active toggle */}
-          <div className="border-b border-slate-200 py-3 px-2">
+          <div className="border-b border-ink border-2 py-3 px-2">
             <div className="flex items-center justify-between">
-              <span className="text-[14px] font-bold text-slate-900">Active</span>
+              <span className="text-[14px] font-display font-semibold tracking-wide font-bold text-ink">Active</span>
               <button
                 type="button"
                 aria-pressed={isActive}
                 aria-label="Toggle event active"
                 onClick={() => setIsActive((v) => !v)}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                  isActive ? 'bg-primary' : 'bg-slate-300'
-                }`}
+                className={`relative inline-flex h-5 w-9 items-center rounded-sm transition-colors ${
+ isActive ? 'bg-stamp' : 'bg-clay/30'
+ }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    isActive ? 'translate-x-4' : 'translate-x-0.5'
-                  }`}
+                  className={`inline-block h-4 w-4 transform rounded-sm bg-paper transition-transform ${
+ isActive ? 'translate-x-4' : 'translate-x-0.5'
+ }`}
                 />
               </button>
             </div>
-            <p className="mt-1 text-[12px] text-slate-500">
+            <p className="mt-1 text-[12px] font-medium text-ink/60">
               {isActive ? 'Invitees can book this event' : 'Event is hidden from booking page'}
             </p>
           </div>
         </form>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white border-t border-slate-200 p-4 flex items-center gap-3">
+        <div className="sticky bottom-0 bg-paper border-t border-ink border-2 p-4 flex items-center gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2 px-4 rounded-full border border-slate-200 text-[13px] font-bold text-slate-700 hover:bg-slate-50"
+            className="flex-1 py-2 px-4 rounded-sm border-2 border-ink text-[13px] font-medium font-bold text-ink/80 hover:bg-clay/5"
           >
             Cancel
           </button>
           <button
             type="submit"
             form="event-drawer-form"
-            className="flex-1 py-2 px-4 rounded-full bg-primary text-[13px] font-bold text-white hover:opacity-90"
+            className="flex-1 py-2 px-4 rounded-sm bg-stamp text-[13px] font-medium font-bold text-paper hover:opacity-90"
           >
             {isEditing ? 'Save changes' : 'Create'}
           </button>

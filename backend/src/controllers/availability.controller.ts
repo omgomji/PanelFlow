@@ -26,7 +26,7 @@ import {
 export const availabilityController = {
   /** GET /api/availability */
   async get(req: Request, res: Response) {
-    const userId = (req as any).user.id;
+    const userId = req.user!.id;
     const schedule = await availabilityService.getByUser(userId);
 
     if (!schedule) {
@@ -38,7 +38,7 @@ export const availabilityController = {
 
   /** PUT /api/availability */
   async upsert(req: Request, res: Response) {
-    const userId = (req as any).user.id;
+    const userId = req.user!.id;
     const {
       timezone,
       days,
