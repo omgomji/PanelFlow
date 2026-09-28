@@ -23,9 +23,6 @@ enum BookingStatus {
   NO_SHOW
 }
 
-/// The host/admin who owns event types and availability.
-/// passwordHash stores bcrypt hash; role defaults to INTERVIEWER.
-/// ADMIN accounts are created only via seed, never through the register endpoint.
 model User {
   id                   Int                   @id @default(autoincrement())
   username             String                @unique
@@ -47,8 +44,6 @@ model User {
   aiAccessVersion      Int                   @default(0)
 }
 
-/// A bookable meeting template (e.g. "30 Min Interview").
-/// Each event type generates a unique public booking link: /:username/:slug
 model EventType {
   id          Int       @id @default(autoincrement())
   userId      Int
@@ -63,26 +58,21 @@ model EventType {
   @@unique([userId, slug])
 }
 
-/// Per-user schedule container. Holds the host's timezone and groups
-/// the individual day rules. One schedule per user (MVP).
 model AvailabilitySchedule {
-  id                        Int                      @id @default(autoincrement())
-  userId                    Int                      @unique
+  id                        Int                        @id @default(autoincrement())
+  userId                    Int                        @unique
   timezone                  String
-  beforeEventBufferMinutes  Int                      @default(0)
-  afterEventBufferMinutes   Int                      @default(0)
-  startTimeIncrementMinutes Int                      @default(30)
-  minimumNoticeMinutes      Int                      @default(0)
-  maximumDaysInFuture       Int                      @default(60)
-  allowBackToBack           Boolean                  @default(true)
+  beforeEventBufferMinutes  Int                        @default(0)
+  afterEventBufferMinutes   Int                        @default(0)
+  startTimeIncrementMinutes Int                        @default(30)
+  minimumNoticeMinutes      Int                        @default(0)
+  maximumDaysInFuture       Int                        @default(60)
+  allowBackToBack           Boolean                    @default(true)
   days                      AvailabilityDay[]
   dateOverrides             AvailabilityDateOverride[]
-  user                      User                     @relation(fields: [userId], references: [id])
+  user                      User                       @relation(fields: [userId], references: [id])
 }
 
-/// Individual day-level availability rule (e.g. "Monday 09:00–17:00").
-/// Times are LOCAL to the schedule's timezone — not UTC.
-/// This preserves human intent across DST transitions.
 model AvailabilityDay {
   id         Int                    @id @default(autoincrement())
   scheduleId Int
@@ -93,35 +83,29 @@ model AvailabilityDay {
   @@unique([scheduleId, dayOfWeek])
 }
 
-/// Time intervals for a given weekday rule.
-/// Example for Monday: [09:00-12:00, 13:00-17:00].
 model AvailabilityInterval {
-  id        Int             @id @default(autoincrement())
+  id        Int              @id @default(autoincrement())
   dayId     Int
   startTime String
   endTime   String
   order     Int
-  day       AvailabilityDay @relation(fields: [dayId], references: [id])
+  day       AvailabilityDay  @relation(fields: [dayId], references: [id])
 
   @@unique([dayId, order])
   @@index([dayId, startTime, endTime])
 }
 
-/// Date-specific availability rules that override weekly day rules.
-/// Example: 2026-12-25 can be marked unavailable or custom hours.
 model AvailabilityDateOverride {
-  id         Int                               @id @default(autoincrement())
-  scheduleId Int
-  date       DateTime                          @db.Date
-  intervals  AvailabilityDateOverrideInterval[]
-  schedule   AvailabilitySchedule              @relation(fields: [scheduleId], references: [id])
+  id                        Int                               @id @default(autoincrement())
+  scheduleId                Int
+  date                      DateTime                          @db.Date
+  intervals                 AvailabilityDateOverrideInterval[]
+  schedule                  AvailabilitySchedule              @relation(fields: [scheduleId], references: [id])
 
   @@unique([scheduleId, date])
   @@index([scheduleId, date])
 }
 
-/// Time intervals for a date-specific override.
-/// Empty interval list means the date is explicitly unavailable.
 model AvailabilityDateOverrideInterval {
   id         Int                      @id @default(autoincrement())
   overrideId Int
@@ -134,8 +118,6 @@ model AvailabilityDateOverrideInterval {
   @@index([overrideId, startTime, endTime])
 }
 
-/// A job opening that groups one or more interview panels under a shared title.
-/// Created by ADMIN users; panels within a position share the same candidate pipeline.
 model Position {
   id          Int            @id @default(autoincrement())
   title       String
@@ -147,9 +129,6 @@ model Position {
   createdAt   DateTime       @default(now())
 }
 
-/// A named interview panel within a position (e.g. "Technical Round").
-/// Slug is globally unique (not scoped to Position) so the public booking URL
-/// /panel/:slug never collides across different positions.
 model Panel {
   id           Int                @id @default(autoincrement())
   positionId   Int
@@ -162,8 +141,6 @@ model Panel {
   bookings     Booking[]
 }
 
-/// Join table: which interviewers sit on a given panel.
-/// The @@unique constraint prevents adding the same interviewer twice.
 model PanelInterviewer {
   id      Int   @id @default(autoincrement())
   panelId Int
@@ -174,37 +151,26 @@ model PanelInterviewer {
   @@unique([panelId, userId])
 }
 
-/// A confirmed (or cancelled) meeting between a host and an invitee.
-///
-/// eventTypeId + userId are set for individual bookings (existing path, unchanged).
-/// panelId is set for panel bookings (new path). The booking_exactly_one_kind
-/// CHECK constraint (in setup-constraints.ts) enforces mutual exclusivity at the DB level.
-///
-/// userId on individual bookings is denormalised from eventType.userId for two reasons:
-/// 1. The PostgreSQL exclusion constraint (no_overlapping_bookings) needs
-/// userId as a local column — it cannot reference columns in other tables.
-/// 2. Every major query (upcoming meetings, overlap check) filters by userId.
-/// Having it local eliminates the JOIN for filtering.
 model Booking {
-  id           Int           @id @default(autoincrement())
-  uid          String        @unique @default(uuid())
-  eventTypeId  Int?
-  userId       Int?
-  panelId      Int?
-  inviteeName  String
-  inviteeEmail String
-  startTime    DateTime
-  endTime      DateTime
-  durationMinutes Int
-  inviteeNotes String?
-  status       BookingStatus @default(SCHEDULED)
+  id                 Int           @id @default(autoincrement())
+  uid                String        @unique @default(uuid())
+  eventTypeId        Int?
+  userId             Int?
+  panelId            Int?
+  inviteeName        String
+  inviteeEmail       String
+  startTime          DateTime
+  endTime            DateTime
+  durationMinutes    Int
+  inviteeNotes       String?
+  status             BookingStatus @default(SCHEDULED)
   cancellationReason String?
-  createdAt    DateTime      @default(now())
-  eventType    EventType?    @relation(fields: [eventTypeId], references: [id])
-  user         User?         @relation(fields: [userId], references: [id])
-  panel        Panel?        @relation(fields: [panelId], references: [id])
-  hosts        BookingHost[]
-  feedback     Feedback[]
+  createdAt          DateTime      @default(now())
+  eventType          EventType?    @relation(fields: [eventTypeId], references: [id])
+  user               User?         @relation(fields: [userId], references: [id])
+  panel              Panel?        @relation(fields: [panelId], references: [id])
+  hosts              BookingHost[]
+  feedback           Feedback[]
 
   @@index([userId, status, startTime, endTime])
   @@index([userId, startTime])
@@ -212,12 +178,6 @@ model Booking {
   @@index([panelId])
 }
 
-/// Per-interviewer leg of a booking. Exists for BOTH individual and panel bookings
-/// (one row for individual, N rows for panel) so a single exclusion constraint here
-/// catches double-booking conflicts across booking types — see setup-constraints.ts.
-/// startTime/endTime/status are denormalized copies of the parent Booking's values,
-/// kept in sync on create/cancel/reschedule, purely so the exclusion constraint
-/// (which needs its columns local to this table) can be declared on userId here.
 model BookingHost {
   id        Int           @id @default(autoincrement())
   bookingId Int
@@ -233,8 +193,6 @@ model BookingHost {
   @@index([userId, status, startTime, endTime])
 }
 
-/// A CRM-style person record for the host's admin workspace.
-/// Used by Contacts page for storing invitees and manual entries.
 model Contact {
   id        Int      @id @default(autoincrement())
   userId    Int
@@ -258,6 +216,7 @@ model RefreshSession {
   revokedAt   DateTime?
   rotatedFrom Int?
   user        User      @relation(fields: [userId], references: [id])
+
   @@index([userId, expiresAt])
 }
 
@@ -268,7 +227,6 @@ enum Recommendation {
   STRONG_YES
 }
 
-/// Structured post-interview feedback submitted by a panelist.
 model Feedback {
   id             Int            @id @default(autoincrement())
   bookingId      Int
@@ -284,20 +242,17 @@ model Feedback {
   @@index([bookingId])
 }
 
-
-/// Tracks the canonical application source represented in the RAG vector index.
-/// PostgreSQL remains the source of truth; this model is only index bookkeeping.
 model RagSource {
-  id          String   @id @default(uuid()) @db.Uuid
-  sourceType  String
-  sourceId    String
-  contentHash String
-  indexVersion Int     @default(1)
-  chunkCount  Int      @default(0)
-  indexedAt   DateTime?
-  lastError   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid()) @db.Uuid
+  sourceType   String
+  sourceId     String
+  contentHash  String
+  indexVersion Int      @default(1)
+  chunkCount   Int      @default(0)
+  indexedAt    DateTime?
+  lastError    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@unique([sourceType, sourceId])
   @@index([sourceType])
@@ -305,10 +260,8 @@ model RagSource {
   @@map("rag_sources")
 }
 
-/// Vector chunks are stored in PostgreSQL and accessed through LangChain's PGVectorStore.
-/// Prisma does not manipulate the unsupported vector column directly.
 model RagChunk {
-  id        String @id @db.Uuid
+  id        String                @id @db.Uuid
   content   String
   metadata  Json
   embedding Unsupported("vector")
