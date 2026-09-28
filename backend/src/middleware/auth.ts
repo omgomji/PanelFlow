@@ -11,6 +11,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { UnauthorizedError, ForbiddenError } from '../utils/errors';
+import { prisma } from '../config/prisma';
 
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
@@ -21,6 +22,7 @@ function getJwtSecret(): string {
 interface JwtPayload {
   userId: number;
   role: 'ADMIN' | 'INTERVIEWER';
+  tokenVersion?: number;
 }
 
 export const requireAuth = (req: Request, _res: Response, next: NextFunction): void => {
@@ -32,8 +34,11 @@ export const requireAuth = (req: Request, _res: Response, next: NextFunction): v
 
   try {
     const payload = jwt.verify(token, getJwtSecret()) as JwtPayload;
-    req.user = { id: payload.userId, role: payload.role };
-    next();
+    prisma.user.findUnique({ where: { id: payload.userId }, select: { role: true, tokenVersion: true } }).then((user) => {
+      if (!user || user.tokenVersion !== payload.tokenVersion) return next(new UnauthorizedError('Session has been revoked'));
+      req.user = { id: payload.userId, role: user.role };
+      next();
+    }).catch(next);
   } catch {
     next(new UnauthorizedError('Invalid or expired token'));
   }
@@ -45,14 +50,14 @@ export const requireAuth = (req: Request, _res: Response, next: NextFunction): v
  * (JWT is stateless; see README Known Limitations).
  */
 export const requireRole = (role: 'ADMIN' | 'INTERVIEWER') => {
-  return (req: Request, _res: Response, next: NextFunction): void => {
+  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     if (!req.user) {
       return next(new UnauthorizedError('Authentication required'));
     }
-    if (req.user.role !== role) {
+    const user = await prisma.user.findUnique({ where: { id: req.user.id }, select: { role: true } });
+    if (user?.role !== role) {
       return next(new ForbiddenError(`This action requires ${role} role`));
     }
     next();
   };
 };
-

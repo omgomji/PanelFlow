@@ -4,7 +4,6 @@
  * Manages the host's weekly availability schedule.
  * Each user has at most one schedule containing 0–7 day rules.
  */
-import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma';
 
 type AvailabilityIntervalInput = {
@@ -52,26 +51,6 @@ function toYyyyMmDd(value: Date | string): string {
   return value.toISOString().slice(0, 10);
 }
 
-function isLegacyBufferColumnError(error: unknown): boolean {
-  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
-    return false;
-  }
-
-  if (error.code !== 'P2022') {
-    return false;
-  }
-
-  const details = `${error.message} ${JSON.stringify(error.meta ?? {})}`;
-  return (
-    details.includes('beforeEventBufferMinutes') ||
-    details.includes('afterEventBufferMinutes') ||
-    details.includes('startTimeIncrementMinutes') ||
-    details.includes('minimumNoticeMinutes') ||
-    details.includes('maximumDaysInFuture') ||
-    details.includes('allowBackToBack')
-  );
-}
-
 async function findScheduleWithBuffers(client: any, userId: number) {
   return client.availabilitySchedule.findUnique({
     where: { userId },
@@ -80,35 +59,6 @@ async function findScheduleWithBuffers(client: any, userId: number) {
       dateOverrides: DATE_OVERRIDES_INCLUDE,
     },
   });
-}
-
-async function findLegacySchedule(client: any, userId: number) {
-  return client.availabilitySchedule.findUnique({
-    where: { userId },
-    select: {
-      id: true,
-      userId: true,
-      timezone: true,
-      days: DAYS_INCLUDE,
-      dateOverrides: DATE_OVERRIDES_INCLUDE,
-    },
-  });
-}
-
-function withDefaultSettings<T extends Record<string, any> | null>(schedule: T) {
-  if (!schedule) {
-    return null;
-  }
-
-  return {
-    ...schedule,
-    beforeEventBufferMinutes: schedule.beforeEventBufferMinutes ?? 0,
-    afterEventBufferMinutes: schedule.afterEventBufferMinutes ?? 0,
-    startTimeIncrementMinutes: schedule.startTimeIncrementMinutes ?? 30,
-    minimumNoticeMinutes: schedule.minimumNoticeMinutes ?? 0,
-    maximumDaysInFuture: schedule.maximumDaysInFuture ?? 60,
-    allowBackToBack: schedule.allowBackToBack ?? true,
-  };
 }
 
 function withNormalizedDateOverrides<T extends Record<string, any> | null>(schedule: T) {
@@ -217,7 +167,6 @@ async function upsertInTransaction(
     maximumDaysInFuture?: number;
     allowBackToBack?: boolean;
   } | undefined,
-  supportsBufferColumns: boolean
 ) {
   let schedule = await tx.availabilitySchedule.findUnique({
     where: { userId },
@@ -229,19 +178,16 @@ async function upsertInTransaction(
       timezone,
     };
 
-    if (supportsBufferColumns) {
-      createData.beforeEventBufferMinutes = options?.beforeEventBufferMinutes ?? 0;
-      createData.afterEventBufferMinutes = options?.afterEventBufferMinutes ?? 0;
-      createData.startTimeIncrementMinutes = options?.startTimeIncrementMinutes ?? 30;
-      createData.minimumNoticeMinutes = options?.minimumNoticeMinutes ?? 0;
-      createData.maximumDaysInFuture = options?.maximumDaysInFuture ?? 60;
-      createData.allowBackToBack = options?.allowBackToBack ?? true;
-    }
+    createData.beforeEventBufferMinutes = options?.beforeEventBufferMinutes ?? 0;
+    createData.afterEventBufferMinutes = options?.afterEventBufferMinutes ?? 0;
+    createData.startTimeIncrementMinutes = options?.startTimeIncrementMinutes ?? 30;
+    createData.minimumNoticeMinutes = options?.minimumNoticeMinutes ?? 0;
+    createData.maximumDaysInFuture = options?.maximumDaysInFuture ?? 60;
+    createData.allowBackToBack = options?.allowBackToBack ?? true;
 
     schedule = await tx.availabilitySchedule.create({ data: createData });
   } else {
     const updateData: any = { timezone };
-    if (supportsBufferColumns) {
       if (options?.beforeEventBufferMinutes !== undefined) {
         updateData.beforeEventBufferMinutes = options.beforeEventBufferMinutes;
       }
@@ -260,7 +206,6 @@ async function upsertInTransaction(
       if (options?.allowBackToBack !== undefined) {
         updateData.allowBackToBack = options.allowBackToBack;
       }
-    }
 
     schedule = await tx.availabilitySchedule.update({
       where: { userId },
@@ -273,13 +218,7 @@ async function upsertInTransaction(
     await replaceScheduleDateOverrides(tx, schedule.id, dateOverrides);
   }
 
-  if (supportsBufferColumns) {
-    const fullSchedule = await findScheduleWithBuffers(tx, userId);
-    return withNormalizedDateOverrides(withDefaultSettings(fullSchedule));
-  }
-
-  const legacySchedule = await findLegacySchedule(tx, userId);
-  return withNormalizedDateOverrides(withDefaultSettings(legacySchedule));
+  return withNormalizedDateOverrides(await findScheduleWithBuffers(tx, userId));
 }
 
 export const availabilityService = {
@@ -288,17 +227,7 @@ export const availabilityService = {
    * Returns null if no schedule has been configured yet.
    */
   async getByUser(userId: number) {
-    try {
-      const schedule = await findScheduleWithBuffers(prisma, userId);
-      return withNormalizedDateOverrides(withDefaultSettings(schedule));
-    } catch (error) {
-      if (!isLegacyBufferColumnError(error)) {
-        throw error;
-      }
-
-      const legacySchedule = await findLegacySchedule(prisma, userId);
-      return withNormalizedDateOverrides(withDefaultSettings(legacySchedule));
-    }
+    return withNormalizedDateOverrides(await findScheduleWithBuffers(prisma, userId));
   },
 
   /**
@@ -327,35 +256,6 @@ export const availabilityService = {
       dateOverrides?: AvailabilityDateOverrideInput[];
     }
   ) {
-    try {
-      return await prisma.$transaction((tx) =>
-        upsertInTransaction(
-          tx,
-          userId,
-          timezone,
-          days,
-          options?.dateOverrides,
-          options,
-          true
-        )
-      );
-    } catch (error) {
-      if (!isLegacyBufferColumnError(error)) {
-        throw error;
-      }
-
-      // Backward compatibility for local DBs not migrated yet.
-      return prisma.$transaction((tx) =>
-        upsertInTransaction(
-          tx,
-          userId,
-          timezone,
-          days,
-          options?.dateOverrides,
-          options,
-          false
-        )
-      );
-    }
+    return prisma.$transaction((tx) => upsertInTransaction(tx, userId, timezone, days, options?.dateOverrides, options));
   },
 };

@@ -6,8 +6,6 @@ import type { EventType, EventTypePayload } from '@/types/event-types';
 import type { WorkloadRow } from '@/lib/api';
 import EventCard from '@/components/EventCard';
 import EventDrawer from '@/components/EventDrawer';
-import SingleUseLinkDrawer from '@/components/SingleUseLinkDrawer';
-import MeetingPollDrawer from '@/components/MeetingPollDrawer';
 import CreateMenuPopover from '@/components/ui/CreateMenuPopover';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -24,8 +22,6 @@ export default function Dashboard() {
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [loading, setLoading] = useState(true);
   const [eventDrawerOpen, setEventDrawerOpen] = useState(false);
-  const [singleUseLinkDrawerOpen, setSingleUseLinkDrawerOpen] = useState(false);
-  const [meetingPollDrawerOpen, setMeetingPollDrawerOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventType | null>(null);
   const [activeTab, setActiveTab] = useState('Event types');
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
@@ -46,13 +42,9 @@ export default function Dashboard() {
   const showAlert = (title: string, message: string) => setAlertInfo({ isOpen: true, title, message });
   const closeAlert = () => setAlertInfo(prev => ({ ...prev, isOpen: false }));
 
-  const tabs = ['Event types', 'Single-use links', 'Meeting polls'];
+  const tabs = ['Event types'];
 
-  const searchPlaceholder = useMemo(() => {
-    if (activeTab === 'Meeting polls') return 'Search meeting polls';
-    if (activeTab === 'Single-use links') return 'Search single-use links';
-    return 'Search event types...';
-  }, [activeTab]);
+  const searchPlaceholder = useMemo(() => 'Search event types...', []);
 
   useEffect(() => {
     fetchEventTypes();
@@ -66,26 +58,10 @@ export default function Dashboard() {
       setEventDrawerOpen(true);
     };
 
-    const handleOpenSingleUseLinks = () => {
-      setActiveTab('Single-use links');
-      setSingleUseLinkDrawerOpen(true);
-      setCreateMenuOpen(false);
-    };
-
-    const handleOpenMeetingPolls = () => {
-      setActiveTab('Meeting polls');
-      setMeetingPollDrawerOpen(true);
-      setCreateMenuOpen(false);
-    };
-
     window.addEventListener('open-create-event', handleOpenCreate);
-    window.addEventListener('open-single-use-links', handleOpenSingleUseLinks);
-    window.addEventListener('open-meeting-polls', handleOpenMeetingPolls);
 
     return () => {
       window.removeEventListener('open-create-event', handleOpenCreate);
-      window.removeEventListener('open-single-use-links', handleOpenSingleUseLinks);
-      window.removeEventListener('open-meeting-polls', handleOpenMeetingPolls);
     };
   }, [user?.role]);
 
@@ -236,11 +212,6 @@ export default function Dashboard() {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const handleCreateSingleUseLink = () => {
-    setActiveTab('Single-use links');
-    setSingleUseLinkDrawerOpen(true);
-  };
-
   const handleDuplicate = async (event: EventType) => {
     const existingSlugs = new Set(eventTypes.map((e) => e.slug));
     const baseSlug = `${event.slug}-copy`;
@@ -351,14 +322,6 @@ export default function Dashboard() {
             <div role="menu" aria-label="Create menu" className="absolute right-0 mt-2 z-50 border-2 border-ink bg-paper shadow-sm">
               <CreateMenuPopover
                 onCreateEventType={handleCreateEventType}
-                onCreateSingleUseLink={() => {
-                  setCreateMenuOpen(false);
-                  setActiveTab('Single-use links');
-                }}
-                onCreateMeetingPoll={() => {
-                  setCreateMenuOpen(false);
-                  setActiveTab('Meeting polls');
-                }}
               />
             </div>
           )}
@@ -389,13 +352,6 @@ export default function Dashboard() {
           />
         </div>
 
-        {activeTab === 'Meeting polls' && (
-          <Button variant="secondary" className="gap-2">
-            <span className="material-symbols-outlined text-[18px]">filter_list</span>
-            Filter
-            <span className="material-symbols-outlined text-[18px]">keyboard_arrow_down</span>
-          </Button>
-        )}
       </div>
 
       {/* User Context Line (Event types) */}
@@ -515,7 +471,6 @@ export default function Dashboard() {
                       onDelete={handleDelete}
                       onEdit={handleEdit}
                       onBookMeeting={handleBookMeeting}
-                      onCreateSingleUseLink={handleCreateSingleUseLink}
                       onDuplicate={handleDuplicate}
                       onToggleActive={handleToggleActive}
                       onSelect={handleToggleSelection}
@@ -539,47 +494,6 @@ export default function Dashboard() {
             </div>
           )}
         </>
-      )}
-
-      {activeTab === 'Single-use links' && (
-        <Card className="mt-8 bg-clay/5 p-8">
-          <CardTitle>Share one-time booking links</CardTitle>
-          <p className="mt-2 max-w-2xl text-[14px] text-ink/70">
-            Single-use links let you generate a one-off scheduling link without creating a permanent event type.
-          </p>
-          <div className="mt-6">
-            <Button type="button" onClick={handleCreateSingleUseLink} className="gap-2">
-              <span className="material-symbols-outlined text-[18px]">add</span>
-              Create single-use link
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {activeTab === 'Meeting polls' && (
-        <Card className="mt-6 overflow-hidden bg-clay/5 p-8">
-          <div className="grid grid-cols-1 items-center gap-8 md:grid-cols-2">
-            <div>
-              <CardTitle>Find the best time for everyone</CardTitle>
-              <p className="mt-2 text-[14px] text-ink/70">
-                Gather everyone’s availability to pick the best time for the group. Track votes as they come in, and book the most popular time.
-              </p>
-
-              <div className="mt-6 flex flex-wrap items-center gap-4">
-                <Button onClick={() => setMeetingPollDrawerOpen(true)} className="gap-2">
-                  <span className="material-symbols-outlined text-[18px]">add</span>
-                  Create meeting poll
-                </Button>
-              </div>
-            </div>
-
-            <div className="flex justify-center md:justify-end">
-              <div className="flex h-[180px] w-[240px] items-center justify-center border-2 border-ink bg-paper">
-                <span className="material-symbols-outlined text-[64px] text-stamp">calendar_month</span>
-              </div>
-            </div>
-          </div>
-        </Card>
       )}
 
       {/* Workload Widget (Admin Only) */}
@@ -642,17 +556,6 @@ export default function Dashboard() {
         }
       />
 
-      <SingleUseLinkDrawer
-        isOpen={singleUseLinkDrawerOpen}
-        onClose={() => setSingleUseLinkDrawerOpen(false)}
-        onSave={() => setSingleUseLinkDrawerOpen(false)}
-      />
-
-      <MeetingPollDrawer
-        isOpen={meetingPollDrawerOpen}
-        onClose={() => setMeetingPollDrawerOpen(false)}
-        onSave={() => setMeetingPollDrawerOpen(false)}
-      />
 
       <ConfirmDialog
         isOpen={deleteConfirmId !== null}

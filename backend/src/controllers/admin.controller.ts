@@ -14,7 +14,7 @@ export const adminController = {
       const hosts = await prisma.bookingHost.groupBy({
         by: ['userId'],
         where: {
-          startTime: { gte: startDate },
+          startTime: { gte: startDate, lt: new Date() },
           status: { not: 'CANCELLED' }
         },
         _count: {

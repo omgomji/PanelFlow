@@ -5,6 +5,7 @@
  */
 import { prisma } from '../config/prisma';
 import { BadRequestError, NotFoundError } from '../utils/errors';
+import { deleteSource, indexContact } from '../ai/indexers/indexer.service';
 
 type ContactCreateInput = {
   name: string;
@@ -79,7 +80,7 @@ export const contactsService = {
       throw new BadRequestError('A contact with this email already exists');
     }
 
-    return prisma.contact.create({
+    const created = await prisma.contact.create({
       data: {
         userId,
         name,
@@ -88,6 +89,8 @@ export const contactsService = {
         note,
       },
     });
+    void indexContact(created.id).catch((error) => console.error('[ai] contact index failed after create', { contactId: created.id, error: error instanceof Error ? error.message : String(error) }));
+    return created;
   },
 
   /** Update an existing contact with ownership + dedupe checks. */
@@ -120,7 +123,7 @@ export const contactsService = {
       }
     }
 
-    return prisma.contact.update({
+    const updated = await prisma.contact.update({
       where: { id },
       data: {
         name: nextName,
@@ -130,6 +133,8 @@ export const contactsService = {
         note: data.note !== undefined ? cleanOptionalText(data.note) : undefined,
       },
     });
+    void indexContact(updated.id).catch((error) => console.error('[ai] contact index failed after update', { contactId: updated.id, error: error instanceof Error ? error.message : String(error) }));
+    return updated;
   },
 
   /** Delete a contact owned by user. */
@@ -141,6 +146,7 @@ export const contactsService = {
     }
 
     await prisma.contact.delete({ where: { id } });
+    void deleteSource('contact', String(id)).catch((error) => console.error('[ai] contact vector delete failed', { contactId: id, error: error instanceof Error ? error.message : String(error) }));
     return { success: true };
   },
 };

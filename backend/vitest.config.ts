@@ -9,10 +9,9 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
     },
-    poolOptions: {
-      threads: {
-        singleThread: true, // Prevent concurrent tests stepping on DB
-      },
-    },
+    // Vitest 4 removed `poolOptions.threads.singleThread`.
+    // Disabling file parallelism provides the same database-safe behavior.
+    fileParallelism: false,
+    maxWorkers: 1,
   },
 });

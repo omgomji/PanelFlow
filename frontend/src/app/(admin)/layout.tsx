@@ -59,14 +59,14 @@ export default function AdminLayout({
     if (loading && loadState === 'loading') {
       t = setTimeout(() => setLoadState('slow'), 3000);
     } else if (!loading && loadState === 'slow' && user) {
-      setLoadState('woke');
+      t = setTimeout(() => setLoadState('woke'), 0);
     } else if (!loading && loadState === 'slow' && !user) {
       // Backend was slow but we aren't logged in (401), skip the success message
-      setLoadState('done');
+      t = setTimeout(() => setLoadState('done'), 0);
     } else if (!loading && loadState === 'woke') {
       t = setTimeout(() => setLoadState('done'), 1500);
     } else if (!loading && loadState === 'loading') {
-      setLoadState('done');
+      t = setTimeout(() => setLoadState('done'), 0);
     }
 
     return () => clearTimeout(t);

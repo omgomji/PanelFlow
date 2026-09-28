@@ -2,15 +2,13 @@
 
 type CreateMenuPopoverProps = {
   onCreateEventType: () => void;
-  onCreateSingleUseLink: () => void;
-  onCreateMeetingPoll: () => void;
 };
 
 type MenuItem = {
   title: string;
   subtitle: string;
   description: string;
-  action: 'event-type' | 'single-use' | 'meeting-poll';
+  action: 'event-type';
 };
 
 const menuItems: MenuItem[] = [
@@ -19,18 +17,6 @@ const menuItems: MenuItem[] = [
     subtitle: '',
     description: 'Create a new meeting template',
     action: 'event-type',
-  },
-  {
-    title: 'One-off meeting',
-    subtitle: '',
-    description: 'Offer time outside your normal schedule',
-    action: 'single-use',
-  },
-  {
-    title: 'Meeting poll',
-    subtitle: '',
-    description: 'Let invitees vote on a time to meet',
-    action: 'meeting-poll',
   },
 ];
 
@@ -47,21 +33,12 @@ function ItemRow({ item, onSelect }: { item: MenuItem; onSelect: (action: MenuIt
   );
 }
 
-export default function CreateMenuPopover({
-  onCreateEventType,
-  onCreateSingleUseLink,
-  onCreateMeetingPoll,
-}: CreateMenuPopoverProps) {
+export default function CreateMenuPopover({ onCreateEventType }: CreateMenuPopoverProps) {
   const handleSelect = (action: MenuItem['action']) => {
     if (action === 'event-type') {
       onCreateEventType();
       return;
     }
-    if (action === 'single-use') {
-      onCreateSingleUseLink();
-      return;
-    }
-    onCreateMeetingPoll();
   };
 
   return (

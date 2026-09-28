@@ -10,11 +10,23 @@
  * invitees via the public booking URL /:username/:slug.
  */
 import { Request, Response } from 'express';
-import { generateSlots } from '../services/slots.service';
+import { generateSlots, getCandidateDayBounds } from '../services/slots.service';
 import { bookingsService } from '../services/bookings.service';
 import { publicService } from '../services/public.service';
 import { formatInTimeZone } from 'date-fns-tz';
 import { BadRequestError, ConflictError } from '../utils/errors';
+import { isValidTimezone, isValidYyyyMmDd } from '../utils/availability.validation';
+import { validateBookableSlot } from '../services/schedulingValidation.service';
+
+function normalizeBookingInput(body: Record<string, unknown>) {
+  const inviteeName = String(body.inviteeName ?? '').trim();
+  const inviteeEmail = String(body.inviteeEmail ?? '').trim().toLowerCase();
+  const startTime = String(body.startTime ?? '');
+  if (!inviteeName || inviteeName.length > 200) throw new BadRequestError('Invalid inviteeName');
+  if (!inviteeEmail || inviteeEmail.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteeEmail)) throw new BadRequestError('Invalid inviteeEmail');
+  if (Number.isNaN(new Date(startTime).getTime())) throw new BadRequestError('Invalid startTime');
+  return { inviteeName, inviteeEmail, startTime };
+}
 
 export const publicController = {
   /**
@@ -70,9 +82,10 @@ export const publicController = {
     const username = req.params.username as string;
     const slug = req.params.slug as string;
     const date = req.query.date as string | undefined;
+    const timezone = req.query.timezone as string | undefined;
 
-    if (!date) {
-      throw new BadRequestError('Date is required (YYYY-MM-DD)');
+    if (!date || !isValidYyyyMmDd(date) || !timezone || !isValidTimezone(timezone)) {
+      throw new BadRequestError('date (YYYY-MM-DD) and timezone are required');
     }
 
     const user = await publicService.getUserByUsername(username);
@@ -84,14 +97,13 @@ export const publicController = {
       return res.json([]);
     }
 
-    const slots = await generateSlots(
-      user.id,
-      eventType.duration,
-      schedule.timezone,
-      schedule.days,
-      schedule.dateOverrides,
-      date,
-      {
+    const { start: candidateStart, end: candidateEnd } = getCandidateDayBounds(date, timezone);
+    const hostDates = [...new Set([
+      formatInTimeZone(candidateStart, schedule.timezone, 'yyyy-MM-dd'),
+      formatInTimeZone(new Date(candidateEnd.getTime() - 1), schedule.timezone, 'yyyy-MM-dd'),
+    ])];
+    const slotLists = await Promise.all(hostDates.map((hostDate) => generateSlots(
+      user.id, eventType.duration, schedule.timezone, schedule.days, schedule.dateOverrides, hostDate, {
         beforeEventBufferMinutes: schedule.beforeEventBufferMinutes,
         afterEventBufferMinutes: schedule.afterEventBufferMinutes,
         startTimeIncrementMinutes: schedule.startTimeIncrementMinutes,
@@ -99,7 +111,11 @@ export const publicController = {
         maximumDaysInFuture: schedule.maximumDaysInFuture,
         allowBackToBack: schedule.allowBackToBack,
       }
-    );
+    )));
+    const slots = slotLists.flat().filter((slot) => {
+      const instant = new Date(slot);
+      return instant >= candidateStart && instant < candidateEnd;
+    });
 
     res.set('Cache-Control', 'no-store');
     res.json(slots.map(s => ({ time: s })));
@@ -108,22 +124,12 @@ export const publicController = {
   async createBooking(req: Request, res: Response) {
     const username = req.params.username as string;
     const slug = req.params.slug as string;
-    const { inviteeName, inviteeEmail, startTime } = req.body;
-
-    // Validate required fields
-    if (!inviteeName || !inviteeEmail || !startTime) {
-      throw new BadRequestError(
-        'inviteeName, inviteeEmail, and startTime are required'
-      );
-    }
+    const { inviteeName, inviteeEmail, startTime } = normalizeBookingInput(req.body);
 
     const user = await publicService.getUserByUsername(username);
     const eventType = await publicService.getActiveEventType(user.id, slug);
 
-    const startDate = new Date(String(startTime));
-    if (Number.isNaN(startDate.getTime())) {
-      throw new BadRequestError('Invalid startTime value');
-    }
+    const startDate = new Date(startTime);
 
     const schedule = await publicService.getScheduleWithIntervals(user.id);
 
@@ -193,6 +199,7 @@ export const publicController = {
     const effectiveTimezone = schedule?.timezone || booking.user?.timezone || 'UTC';
 
     res.json({
+      kind: booking.panelId ? 'panel' : 'individual',
       booking: {
         uid: booking.uid,
         inviteeName: booking.inviteeName,
@@ -205,6 +212,8 @@ export const publicController = {
       panel: booking.panel
         ? {
             title: booking.panel.title,
+            slug: booking.panel.slug,
+            duration: booking.panel.duration,
             position: booking.panel.position,
             interviewers: booking.panel.interviewers?.map((pi: any) => ({ name: pi.user.name })),
           }
@@ -239,8 +248,11 @@ export const publicController = {
 
     const oldBooking = await bookingsService.getByUidRaw(uid);
 
-    // For panel bookings, userId is null — delegate slot validation to panelSlotsService
+    const candidateTimezone = String(req.body.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
+    if (!isValidTimezone(candidateTimezone)) throw new BadRequestError('Invalid timezone value');
+    // For panel bookings, validate the exact generated panel slot before changing state.
     if (oldBooking.panelId) {
+      await validateBookableSlot({ sourceType: 'panel', slug: oldBooking.panel!.slug, startTime: startDate, candidateTimezone });
       const newBooking = await bookingsService.reschedulePublicBooking(
         uid,
         startDate.toISOString()
@@ -288,6 +300,7 @@ export const publicController = {
       throw new ConflictError('This time slot is no longer available');
     }
 
+    await validateBookableSlot({ sourceType: 'individual', username: oldBooking.user!.username, slug: oldBooking.eventType!.slug, startTime: startDate, candidateTimezone });
     const newBooking = await bookingsService.reschedulePublicBooking(
       uid,
       startDate.toISOString(),

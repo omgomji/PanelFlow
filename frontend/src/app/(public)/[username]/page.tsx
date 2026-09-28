@@ -6,6 +6,14 @@ import { getPublicProfile } from '@/lib/api';
 import Link from 'next/link';
 import type { EventType } from '@/types/event-types';
 import type { PublicUser } from '@/types/public';
+import {
+  PanelFlowMark,
+  PublicBookingHeader,
+  PublicBookingMain,
+  PublicBookingShell,
+  PublicLoadingState,
+  PublicStateCard,
+} from '@/components/PublicBookingLayout';
 
 export default function UserLandingPage() {
   const { username } = useParams<{ username: string }>();
@@ -19,7 +27,6 @@ export default function UserLandingPage() {
       try {
         const data = await getPublicProfile(username);
         setUserData(data.user);
-        // Only show event types that are active
         setEventTypes((data.eventTypes || []).filter((et) => et.isActive !== false));
       } catch (err) {
         console.error('Error fetching user data:', err);
@@ -32,85 +39,95 @@ export default function UserLandingPage() {
     if (username) fetchUserData();
   }, [username]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-clay/5 flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-sm border-b-2 border-stamp border-2" />
-      </div>
-    );
-  }
+  if (loading) return <PublicLoadingState />;
 
-  if (error) {
+  if (error || !userData) {
     return (
-      <div className="min-h-screen bg-clay/5 flex items-center justify-center">
-        <div className="text-red-500 font-medium">{error}</div>
+      <div className="min-h-screen bg-paper">
+        <PublicBookingHeader />
+        <PublicBookingMain className="flex min-h-[70vh] items-center justify-center">
+          <PublicStateCard icon="person_off" title="Profile unavailable" message={error || 'User not found'} tone="danger" />
+        </PublicBookingMain>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-clay/5">
-      {/* Header */}
-      <div className="bg-paper border-b border-ink border-2">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <span className="text-[12px] font-medium font-medium text-ink/60 uppercase tracking-wide">
-            PanelFlow
-          </span>
-        </div>
-      </div>
+    <PublicBookingShell>
+      <PublicBookingHeader rightLabel="Public scheduling link" />
 
-      {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-4 py-8 sm:py-12">
-        {/* Username Header */}
-        <div className="mb-8">
-          <h1 className="text-[32px] font-bold text-ink sm:text-[40px] lg:text-[48px]">{userData?.name || username}</h1>
-          <p className="mt-3 max-w-2xl text-[15px] text-ink/70 sm:text-[16px]">
-            Welcome to my scheduling page. Please follow the instructions to add an event to my calendar.
+      <PublicBookingMain maxWidth="4xl">
+        <section className="mb-8 border-b-2 border-ink pb-7 sm:mb-10 sm:pb-8">
+          <div className="mb-4 flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-stamp">
+            <span className="h-2 w-2 bg-stamp" />
+            {username}
+          </div>
+          <h1 className="max-w-3xl font-display text-4xl font-bold tracking-tight text-ink sm:text-5xl">
+            {userData.name || username}
+          </h1>
+          <p className="mt-4 max-w-2xl text-base leading-7 text-ink/65 sm:text-lg">
+            Choose a meeting type below to find a time that works for you.
           </p>
-        </div>
+        </section>
 
-        {/* Event Types Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {eventTypes.map((event) => (
-            <Link key={event.id} href={`/${username}/${event.slug}`}>
-              <div className="bg-paper rounded-sm border-2 border-ink p-6 hover: transition-shadow cursor-pointer group">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-3 flex-1">
-                    <div className="h-6 w-6 rounded-sm bg-purple-500 flex-shrink-0 mt-1" />
-                    <div>
-                      <h3 className="text-[18px] font-bold text-ink group-hover:text-stamp transition-colors">
+        <section>
+          <div className="mb-4 flex items-end justify-between gap-4">
+            <div>
+              <h2 className="font-display text-lg font-bold uppercase tracking-wide text-ink">Meeting types</h2>
+              <p className="mt-1 text-sm text-ink/55">Select an option to view available times.</p>
+            </div>
+            <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-ink/45">
+              {eventTypes.length} {eventTypes.length === 1 ? 'option' : 'options'}
+            </span>
+          </div>
+
+          {eventTypes.length === 0 ? (
+            <div className="border-2 border-ink p-10 text-center">
+              <span className="material-symbols-outlined text-3xl text-ink/45">event_busy</span>
+              <p className="mt-3 font-display font-bold uppercase tracking-wide text-ink/70">No event types available</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {eventTypes.map((event) => (
+                <Link
+                  key={event.id}
+                  href={`/${username}/${event.slug}`}
+                  className="group block border-2 border-ink bg-paper p-5 transition-transform hover:-translate-y-0.5 hover:bg-clay/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-stamp"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="mb-4 flex items-center gap-3">
+                        <span className="h-3 w-3 shrink-0 bg-stamp" />
+                        <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-ink/50">
+                          {event.duration} min
+                        </span>
+                      </div>
+                      <h3 className="font-display text-xl font-bold text-ink transition-colors group-hover:text-stamp">
                         {event.title}
                       </h3>
+                      {event.description && (
+                        <p className="mt-2 text-sm leading-6 text-ink/65">{event.description}</p>
+                      )}
                     </div>
+                    <span className="material-symbols-outlined mt-0.5 text-[20px] text-ink/45 transition-transform group-hover:translate-x-0.5 group-hover:text-stamp">
+                      arrow_forward
+                    </span>
                   </div>
-                  <span className="material-symbols-outlined text-ink/50 group-hover:text-ink/70 transition-colors">
-                    chevron_right
-                  </span>
-                </div>
-                {event.description && (
-                  <p className="text-[14px] font-display font-semibold tracking-wide text-ink/70 mt-2 ml-9">
-                    {event.description}
-                  </p>
-                )}
-                <div className="flex items-center gap-1 text-[13px] font-medium text-ink/60 mt-3 ml-9">
-                  <span className="material-symbols-outlined text-[16px]">schedule</span>
-                  {event.duration} min
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
 
-        {eventTypes.length === 0 && (
-          <div className="bg-paper rounded-sm border-2 border-ink p-12 text-center">
-            <p className="text-ink/70">No event types available</p>
-          </div>
-        )}
-      </div>
+                  <div className="mt-6 flex items-center gap-2 border-t border-clay/30 pt-4 text-xs font-semibold uppercase tracking-wider text-ink/55">
+                    <span className="material-symbols-outlined text-[16px]">schedule</span>
+                    View availability
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
 
-      {/* Footer */}
-      <div className="mt-12 py-6 border-t border-ink border-2 text-center text-[12px] font-medium text-ink/60">
-      </div>
-    </div>
+        <footer className="mt-12 border-t-2 border-ink pt-5 text-center sm:mt-16">
+          <PanelFlowMark compact />
+        </footer>
+      </PublicBookingMain>
+    </PublicBookingShell>
   );
 }

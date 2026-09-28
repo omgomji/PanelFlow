@@ -16,13 +16,15 @@ export interface PaginatedResponse<T> {
 }
 
 const resolveApiBaseUrl = () => {
-  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
-
   if (typeof window !== 'undefined') {
+    const configuredUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (configuredUrl && !/localhost|127\.0\.0\.1/.test(configuredUrl)) {
+      return configuredUrl;
+    }
     return `http://${window.location.hostname}:5000/api`;
   }
 
-  return 'http://localhost:5000/api';
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 };
 
 const api = axios.create({
@@ -72,6 +74,38 @@ export const logout = async () => {
 
 export const getMe = async (signal?: AbortSignal) => {
   const response = await api.get<{ user: AuthUser }>('/auth/me', { signal });
+  return response.data;
+};
+
+// ── PanelFlow AI ─────────────────────────────────────────────
+export interface AiCitation {
+  sourceType: string;
+  sourceId: string;
+  title: string;
+  date?: string;
+}
+
+export interface AiPendingAction {
+  type: 'cancel_meeting';
+  bookingId: number;
+  confirmationText: string;
+}
+
+export interface PanelFlowAiResponse {
+  answer: string;
+  citations: AiCitation[];
+  intent: 'RAG' | 'DATABASE' | 'HYBRID' | 'CLARIFICATION';
+  operation: string;
+  pendingAction?: AiPendingAction;
+}
+
+export const askPanelFlow = async (query: string, context?: { meetingId?: number; date?: string }): Promise<PanelFlowAiResponse> => {
+  const response = await api.post<PanelFlowAiResponse>('/ai/chat', { query, context });
+  return response.data;
+};
+
+export const rebuildAiIndex = async (): Promise<{ sources: number; chunks: number; failures: number }> => {
+  const response = await api.post<{ sources: number; chunks: number; failures: number }>('/ai/index/rebuild');
   return response.data;
 };
 
@@ -161,10 +195,11 @@ export const getPublicEventDetails = async (username: string, slug: string): Pro
 export const getPublicSlots = async (
   username: string,
   slug: string,
-  date: string
+  date: string,
+  timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 ): Promise<PublicSlotItem[]> => {
   const response = await api.get<PublicSlotItem[]>(`/public/${username}/${slug}/slots`, {
-    params: { date },
+    params: { date, timezone },
   });
   return response.data;
 };
@@ -183,8 +218,8 @@ export const getRescheduleDetails = async (uid: string): Promise<RescheduleDetai
   return response.data;
 };
 
-export const rescheduleBooking = async (uid: string, startTime: string): Promise<CreatedBooking> => {
-  const response = await api.post<CreatedBooking>(`/public/reschedule/${uid}`, { startTime });
+export const rescheduleBooking = async (uid: string, startTime: string, timezone = Intl.DateTimeFormat().resolvedOptions().timeZone): Promise<CreatedBooking> => {
+  const response = await api.post<CreatedBooking>(`/public/reschedule/${uid}`, { startTime, timezone });
   return response.data;
 };
 
@@ -194,16 +229,16 @@ export const getPanelDetails = async (panelSlug: string): Promise<PanelPublicDat
   return response.data;
 };
 
-export const getPanelSlots = async (panelSlug: string, date: string): Promise<PublicSlotItem[]> => {
+export const getPanelSlots = async (panelSlug: string, date: string, timezone = Intl.DateTimeFormat().resolvedOptions().timeZone): Promise<PublicSlotItem[]> => {
   const response = await api.get<PublicSlotItem[]>(`/public/panels/${panelSlug}/slots`, {
-    params: { date },
+    params: { date, timezone },
   });
   return response.data;
 };
 
 export const createPanelBooking = async (
   panelSlug: string,
-  data: { inviteeName: string; inviteeEmail: string; startTime: string }
+  data: { inviteeName: string; inviteeEmail: string; startTime: string; timezone: string }
 ): Promise<PanelCreatedBooking> => {
   const response = await api.post<PanelCreatedBooking>(`/public/panels/${panelSlug}/book`, data);
   return response.data;

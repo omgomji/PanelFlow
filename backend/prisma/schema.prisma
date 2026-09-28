@@ -42,7 +42,9 @@ model User {
   panelMemberships     PanelInterviewer[]
   hostedBookings       BookingHost[]
   feedback             Feedback[]
-  webhookEndpoints     WebhookEndpoint[]
+  refreshSessions      RefreshSession[]
+  tokenVersion         Int                   @default(0)
+  aiAccessVersion      Int                   @default(0)
 }
 
 /// A bookable meeting template (e.g. "30 Min Interview").
@@ -193,8 +195,9 @@ model Booking {
   inviteeEmail String
   startTime    DateTime
   endTime      DateTime
+  durationMinutes Int
+  inviteeNotes String?
   status       BookingStatus @default(SCHEDULED)
-  reminderSentAt     DateTime?
   cancellationReason String?
   createdAt    DateTime      @default(now())
   eventType    EventType?    @relation(fields: [eventTypeId], references: [id])
@@ -247,33 +250,15 @@ model Contact {
   @@index([userId, createdAt])
 }
 
-/// Admin-registered outbound webhook. Secret is stored in plaintext — it's an
-/// outbound signing key our backend must read to sign requests, not an inbound
-/// credential, so hashing it (like a password) would make it unusable.
-model WebhookEndpoint {
-  id         Int               @id @default(autoincrement())
-  userId     Int
-  url        String
-  secret     String
-  events     String[]
-  isActive   Boolean           @default(true)
-  createdAt  DateTime          @default(now())
-  user       User              @relation(fields: [userId], references: [id])
-  deliveries WebhookDelivery[]
-}
-
-model WebhookDelivery {
-  id         Int             @id @default(autoincrement())
-  endpointId Int
-  event      String
-  payload    Json
-  statusCode Int?
-  success    Boolean         @default(false)
-  attempt    Int             @default(1)
-  createdAt  DateTime        @default(now())
-  endpoint   WebhookEndpoint @relation(fields: [endpointId], references: [id])
-
-  @@index([endpointId, createdAt])
+model RefreshSession {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  rotatedFrom Int?
+  user        User      @relation(fields: [userId], references: [id])
+  @@index([userId, expiresAt])
 }
 
 enum Recommendation {
@@ -297,4 +282,36 @@ model Feedback {
 
   @@unique([bookingId, interviewerId])
   @@index([bookingId])
+}
+
+
+/// Tracks the canonical application source represented in the RAG vector index.
+/// PostgreSQL remains the source of truth; this model is only index bookkeeping.
+model RagSource {
+  id          String   @id @default(uuid()) @db.Uuid
+  sourceType  String
+  sourceId    String
+  contentHash String
+  indexVersion Int     @default(1)
+  chunkCount  Int      @default(0)
+  indexedAt   DateTime?
+  lastError   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([sourceType, sourceId])
+  @@index([sourceType])
+  @@index([updatedAt])
+  @@map("rag_sources")
+}
+
+/// Vector chunks are stored in PostgreSQL and accessed through LangChain's PGVectorStore.
+/// Prisma does not manipulate the unsupported vector column directly.
+model RagChunk {
+  id        String @id @db.Uuid
+  content   String
+  metadata  Json
+  embedding Unsupported("vector")
+
+  @@map("rag_chunks")
 }

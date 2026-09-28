@@ -17,7 +17,6 @@ interface EventCardProps {
   onDelete: (id: number) => void;
   onEdit: (event: { id: number; title: string; slug: string; duration: number; description?: string | null }) => void;
   onBookMeeting: (event: { id: number; title: string; slug: string; duration: number; description?: string | null; bookingUrl?: string }) => void;
-  onCreateSingleUseLink: (event: { id: number; title: string; slug: string; duration: number; description?: string | null; bookingUrl?: string }) => void;
   onDuplicate: (event: { id: number; title: string; slug: string; duration: number; description?: string | null; bookingUrl?: string }) => void;
   onToggleActive: (event: { id: number; title: string; slug: string; duration: number; description?: string | null; bookingUrl?: string }, nextValue: boolean) => void | Promise<void>;
   onSelect?: (event: { id: number; title: string; slug: string; duration: number; description?: string | null }) => void;
@@ -36,7 +35,6 @@ export default function EventCard({
   onDelete,
   onEdit,
   onBookMeeting,
-  onCreateSingleUseLink,
   onDuplicate,
   onToggleActive,
   onSelect,
@@ -129,10 +127,6 @@ export default function EventCard({
           </button>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-[13px] font-medium text-ink/70">
             <span>{duration} min</span>
-            <span className="text-clay/50">•</span>
-            <span>Google Meet</span>
-            <span className="text-clay/50">•</span>
-            <span>One-on-One</span>
           </div>
         </div>
 
@@ -151,18 +145,6 @@ export default function EventCard({
               <span className="material-symbols-outlined text-[18px]">calendar_add_on</span>
             </Button>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                onCreateSingleUseLink(eventPayload);
-              }}
-              title="Create single-use link"
-              aria-label="Create single-use link"
-            >
-              <span className="material-symbols-outlined text-[18px]">switch_access_shortcut</span>
-            </Button>
           </div>
 
           <Button

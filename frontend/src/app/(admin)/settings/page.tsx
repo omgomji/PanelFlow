@@ -20,7 +20,7 @@ const COMMON_TIMEZONES = [
 ];
 
 export default function SettingsPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, refreshUser } = useAuth();
   const [timezone, setTimezone] = useState('Asia/Kolkata');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -36,9 +36,8 @@ export default function SettingsPage() {
       setSaving(true);
       setMessage('');
       await updateUser({ timezone });
-      // In a real app we'd trigger a context refresh here
-      // For now, reload to ensure state is completely synced
-      window.location.reload();
+      await refreshUser();
+      setMessage('Settings saved.');
     } catch (err) {
       setMessage('Failed to update settings.');
     } finally {

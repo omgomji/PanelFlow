@@ -93,7 +93,7 @@ export const bookingsController = {
       throw new BadRequestError('Invalid booking ID');
     }
 
-    const booking = await bookingsService.cancel(userId, id, cancellationReason);
+    const booking = await bookingsService.cancel(userId, id, cancellationReason, req.user!.role);
     res.json(booking);
   },
 

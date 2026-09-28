@@ -17,11 +17,6 @@ import {
   parseIntegerInRange,
   parseBoolean,
 } from '../utils/availability.validation';
-import {
-  IST_TIMEZONE,
-  convertDaysToIst,
-  convertDateOverridesToIst,
-} from '../utils/date.utils';
 
 export const availabilityController = {
   /** GET /api/availability */
@@ -72,21 +67,6 @@ export const availabilityController = {
       validateDateOverrides(dateOverrides as AvailabilityDateOverridePayload[]);
     }
 
-    const normalizedDays = convertDaysToIst(
-      sourceTimezone,
-      days as AvailabilityDayPayload[]
-    );
-
-    let normalizedDateOverrides: AvailabilityDateOverridePayload[] | undefined;
-    if (dateOverrides !== undefined) {
-      normalizedDateOverrides = convertDateOverridesToIst(
-        sourceTimezone,
-        dateOverrides as AvailabilityDateOverridePayload[]
-      );
-      validateDateOverrides(normalizedDateOverrides);
-    }
-
-    validateDays(normalizedDays);
 
     const parsedBeforeEventBufferMinutes = parseBufferMinutes(
       beforeEventBufferMinutes,
@@ -119,14 +99,15 @@ export const availabilityController = {
       'allowBackToBack'
     );
 
-    const schedule = await availabilityService.upsert(userId, IST_TIMEZONE, normalizedDays, {
+    const schedule = await availabilityService.upsert(userId, sourceTimezone, days as AvailabilityDayPayload[], {
       beforeEventBufferMinutes: parsedBeforeEventBufferMinutes,
       afterEventBufferMinutes: parsedAfterEventBufferMinutes,
       startTimeIncrementMinutes: parsedStartTimeIncrementMinutes,
       minimumNoticeMinutes: parsedMinimumNoticeMinutes,
       maximumDaysInFuture: parsedMaximumDaysInFuture,
       allowBackToBack: parsedAllowBackToBack,
-      dateOverrides: normalizedDateOverrides,
+      // PUT is a complete replacement: omitted overrides mean none.
+      dateOverrides: (dateOverrides ?? []) as AvailabilityDateOverridePayload[],
     });
     res.json(schedule);
   },

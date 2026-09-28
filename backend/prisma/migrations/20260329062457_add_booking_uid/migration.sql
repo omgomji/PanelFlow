@@ -12,7 +12,9 @@ ADD COLUMN     "minimumNoticeMinutes" INTEGER NOT NULL DEFAULT 0,
 ADD COLUMN     "startTimeIncrementMinutes" INTEGER NOT NULL DEFAULT 30;
 
 -- AlterTable
-ALTER TABLE "Booking" ADD COLUMN     "uid" TEXT NOT NULL;
+ALTER TABLE "Booking" ADD COLUMN "uid" TEXT;
+UPDATE "Booking" SET "uid" = md5(random()::text || clock_timestamp()::text || "id"::text) WHERE "uid" IS NULL;
+ALTER TABLE "Booking" ALTER COLUMN "uid" SET NOT NULL;
 
 -- AlterTable
 ALTER TABLE "User" ALTER COLUMN "timezone" SET DEFAULT 'Asia/Kolkata';

@@ -37,7 +37,6 @@ export default function EventDrawer({
 
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     duration: false,
-    location: false,
     availability: false,
     inviteeLimit: false,
     host: false,
@@ -190,52 +189,6 @@ export default function EventDrawer({
                       <option key={d} value={d}>{d} min</option>
                     ))}
                   </select>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Location Section */}
-          <div className="border-b border-ink border-2">
-            <button
-              type="button"
-              onClick={() => toggleSection('location')}
-              className="w-full flex items-center justify-between py-3 px-2 text-left"
-            >
-              <span className="text-[14px] font-display font-semibold tracking-wide font-bold text-ink">Location</span>
-              <span className="material-symbols-outlined text-[20px] font-display font-semibold tracking-wide text-ink/70">
-                {expandedSections.location ? 'expand_less' : 'expand_more'}
-              </span>
-            </button>
-
-            {expandedSections.location && (
-              <div className="pb-3 px-2">
-                <div className="flex gap-2 mb-2">
-                  <button
-                    type="button"
-                    className="flex-1 py-2 px-3 rounded-sm border-2 border-ink text-[13px] font-medium font-medium text-ink/70 hover:bg-clay/5"
-                  >
-                    <span className="material-symbols-outlined inline text-[18px]">videocam</span>
-                    <div className="text-[12px] font-medium">Zoom</div>
-                  </button>
-                  <button
-                    type="button"
-                    className="flex-1 py-2 px-3 rounded-sm border-2 border-ink text-[13px] font-medium font-medium text-ink/70 hover:bg-clay/5"
-                  >
-                    <span className="material-symbols-outlined inline text-[18px]">phone</span>
-                    <div className="text-[12px] font-medium">Phone</div>
-                  </button>
-                  <button
-                    type="button"
-                    className="flex-1 py-2 px-3 rounded-sm border-2 border-ink text-[13px] font-medium font-medium text-ink/70 hover:bg-clay/5"
-                  >
-                    <span className="material-symbols-outlined inline text-[18px]">location_on</span>
-                    <div className="text-[12px] font-medium">In-person</div>
-                  </button>
-                </div>
-                <div className="text-[12px] font-medium text-ink/60">
-                  <span className="material-symbols-outlined inline text-[16px]">info</span>
-                  No location set
                 </div>
               </div>
             )}

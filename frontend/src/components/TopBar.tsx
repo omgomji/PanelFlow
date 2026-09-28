@@ -17,12 +17,7 @@ export default function TopBar({ sidebarWidth, onMobileMenuToggle }: TopBarProps
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const { user, logout } = useAuth();
   const { theme, setTheme, systemTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
   const initials = user?.name ? user.name.slice(0, 2).toUpperCase() : 'U';
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const headerStyle = {
     '--sidebar-width': `${sidebarWidth}px`,
@@ -56,7 +51,7 @@ export default function TopBar({ sidebarWidth, onMobileMenuToggle }: TopBarProps
   }, [copied]);
 
   const handleCopyLink = () => {
-    const username = user?.name?.toLowerCase().replace(/\s+/g, '') || 'admin';
+    const username = user?.username || 'admin';
     const adminLink = `${window.location.origin}/${username}`;
     navigator.clipboard.writeText(adminLink);
     setCopied(true);
@@ -80,8 +75,7 @@ export default function TopBar({ sidebarWidth, onMobileMenuToggle }: TopBarProps
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4">
-          {mounted && (
-            <button
+          <button
               type="button"
               onClick={() => setTheme(theme === 'dark' || (theme === 'system' && systemTheme === 'dark') ? 'light' : 'dark')}
               className="inline-flex h-9 w-9 items-center justify-center text-ink/70 transition-colors hover:bg-clay/10 hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-stamp rounded-sm"
@@ -91,7 +85,6 @@ export default function TopBar({ sidebarWidth, onMobileMenuToggle }: TopBarProps
                 {theme === 'dark' || (theme === 'system' && systemTheme === 'dark') ? 'light_mode' : 'dark_mode'}
               </span>
             </button>
-          )}
 
           <div className="relative">
             <button

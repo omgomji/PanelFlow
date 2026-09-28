@@ -6,6 +6,12 @@ import { getPublicEventDetails } from '@/lib/api';
 import { formatInTimeZone } from 'date-fns-tz';
 import type { PublicEventData } from '@/types/public';
 import { AlertDialog } from '@/components/ui/AlertDialog';
+import {
+  PublicBookingHeader,
+  PublicBookingMain,
+  PublicBookingShell,
+  PublicLoadingState,
+} from '@/components/PublicBookingLayout';
 
 export default function SuccessPage() {
   const { username, slug } = useParams<{ username: string; slug: string }>();
@@ -31,6 +37,70 @@ export default function SuccessPage() {
   const endDate = endTime ? new Date(endTime) : null;
   const hasMeetingDetails = Boolean(startDate && endDate && !Number.isNaN(startDate.getTime()) && !Number.isNaN(endDate.getTime()));
 
+  const formatIcsDate = (date: Date) =>
+    date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+
+  const escapeIcsText = (value: string) =>
+    value.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+
+  const addToCalendar = () => {
+    if (!startDate || !endDate || !hasMeetingDetails) {
+      showAlert('Calendar', 'Meeting date and time details are not available.');
+      return;
+    }
+
+    const title = eventData?.eventType?.title || 'Meeting';
+    const host = eventData?.user?.name || 'Host';
+    const bookingUrl = `${window.location.origin}/${username}/${slug}`;
+    const description = [
+      `Meeting with ${host}`,
+      inviteeName ? `Invitee: ${inviteeName}` : '',
+      `Booking link: ${bookingUrl}`,
+    ].filter(Boolean).join('\n');
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//PanelFlow//Booking//EN',
+      'BEGIN:VEVENT',
+      `UID:${uid || `${bookingId || 'booking'}@panelflow`}`,
+      `DTSTAMP:${formatIcsDate(new Date())}`,
+      `DTSTART:${formatIcsDate(startDate)}`,
+      `DTEND:${formatIcsDate(endDate)}`,
+      `SUMMARY:${escapeIcsText(title)}`,
+      `DESCRIPTION:${escapeIcsText(description)}`,
+      `URL:${bookingUrl}`,
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${slug}-meeting.ics`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const emailMeetingDetails = () => {
+    const title = eventData?.eventType?.title || 'Meeting';
+    const bookingUrl = `${window.location.origin}/${username}/${slug}`;
+    const dateLine = hasMeetingDetails
+      ? `${formatInTimeZone(startDate as Date, timezone, 'EEEE, MMMM d, yyyy')} at ${formatInTimeZone(startDate as Date, timezone, 'h:mma')} - ${formatInTimeZone(endDate as Date, timezone, 'h:mma')} (${timezone})`
+      : 'The meeting time is shown on the booking page.';
+    const subject = encodeURIComponent(`${title} details`);
+    const body = encodeURIComponent([
+      `Meeting: ${title}`,
+      `Date: ${dateLine}`,
+      inviteeName ? `Invitee: ${inviteeName}` : '',
+      `Booking page: ${bookingUrl}`,
+      uid ? `Reschedule: ${window.location.origin}/reschedule/${uid}` : '',
+    ].filter(Boolean).join('\n'));
+    window.location.href = `mailto:${inviteeEmail || ''}?subject=${subject}&body=${body}`;
+  };
+
   useEffect(() => {
     const fetchEventData = async () => {
       try {
@@ -45,94 +115,96 @@ export default function SuccessPage() {
     if (username && slug) fetchEventData();
   }, [username, slug]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-clay/5 flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-sm border-b-2 border-stamp border-2" />
-      </div>
-    );
-  }
+  if (loading) return <PublicLoadingState />;
 
   return (
-    <div className="min-h-screen bg-clay/5">
-      {/* Header */}
-      <div className="bg-paper border-b border-ink border-2">
-        <div className="max-w-5xl mx-auto px-4 py-3">
-          <span className="text-[12px] font-medium font-medium text-ink/60 uppercase">PanelFlow</span>
-        </div>
-      </div>
+    <PublicBookingShell>
+      <PublicBookingHeader backHref={`/${username}`} backLabel="Back to scheduling page" rightLabel="Booking confirmed" />
 
-      {/* Main Content */}
-      <div className="max-w-2xl mx-auto px-4 py-8 sm:py-12">
-        <div className="bg-paper rounded-sm border-2 border-ink overflow-hidden shadow-200 p-6 text-center sm:p-10 lg:p-12">
-          {/* Success Icon */}
-          <div className="mb-6 flex justify-center">
-            <div className="flex items-center justify-center w-16 h-16 bg-green-100 rounded-sm">
-              <span className="material-symbols-outlined text-[32px] text-green-600">check_circle</span>
+      <PublicBookingMain maxWidth="2xl">
+        <div className="border-2 border-ink bg-paper p-6 shadow-[8px_8px_0_var(--accent-clay)] sm:p-10 lg:p-12">
+          <div className="mx-auto flex max-w-xl flex-col items-center text-center">
+            <div className="mb-5 flex h-14 w-14 items-center justify-center border-2 border-sage bg-sage/10 text-sage">
+              <span className="material-symbols-outlined text-[30px]">check</span>
             </div>
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-sage">Booking confirmed</p>
+            <h1 className="mt-2 font-display text-3xl font-bold tracking-tight text-ink sm:text-4xl">You&apos;re scheduled</h1>
+            <p className="mt-3 text-base text-ink/60">Your meeting has been successfully scheduled.</p>
           </div>
 
-          {/* Success Message */}
-          <h1 className="mb-3 text-[26px] font-bold text-ink sm:text-[32px]">You&apos;re scheduled</h1>
-
-          <p className="text-[16px] text-ink/70 mb-6">
-            {eventData ? `A confirmation email will be sent to the email address provided. ${eventData.user.name} will receive an invitation that they can accept to add this meeting to their calendar.` : 'Your meeting has been successfully scheduled.'}
-          </p>
-
           {hasMeetingDetails && (
-            <div className="mb-8 rounded-sm border-2 border-ink bg-clay/5 p-4 text-left">
-              <h2 className="text-[14px] font-display font-semibold tracking-wide font-bold text-ink">Meeting details</h2>
-              <p className="mt-2 text-[13px] font-medium text-ink/80">
-                {eventData?.eventType?.title || 'Meeting'} with {eventData?.user?.name || 'Host'}
-              </p>
-              <p className="mt-1 text-[12px] font-medium text-ink/70">
-                {formatInTimeZone(startDate as Date, timezone, 'EEEE, MMMM d, yyyy')} at {formatInTimeZone(startDate as Date, timezone, 'h:mma')} - {formatInTimeZone(endDate as Date, timezone, 'h:mma')} ({timezone})
-              </p>
-              {inviteeName && <p className="mt-1 text-[12px] font-medium text-ink/70">Invitee: {inviteeName}</p>}
-              {inviteeEmail && <p className="mt-1 text-[12px] font-medium text-ink/70">Email: {inviteeEmail}</p>}
-              {bookingId && <p className="mt-1 text-[11px] text-ink/60">Booking ID: {bookingId}</p>}
+            <div className="mt-8 border-2 border-ink p-5">
+              <div className="mb-4 flex items-center justify-between gap-4 border-b border-clay/30 pb-3">
+                <h2 className="font-display text-sm font-bold uppercase tracking-wider text-ink">Meeting details</h2>
+                {bookingId && <span className="font-mono text-[10px] text-ink/45">#{bookingId}</span>}
+              </div>
+              <p className="text-sm font-bold text-ink">{eventData?.eventType?.title || 'Meeting'}</p>
+              <p className="mt-1 text-sm text-ink/60">with {eventData?.user?.name || 'Host'}</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="border border-clay/30 bg-clay/5 p-3">
+                  <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-ink/45">Date</p>
+                  <p className="mt-1 text-sm font-semibold text-ink">
+                    {formatInTimeZone(startDate as Date, timezone, 'EEEE, MMMM d, yyyy')}
+                  </p>
+                </div>
+                <div className="border border-clay/30 bg-clay/5 p-3">
+                  <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-ink/45">Time</p>
+                  <p className="mt-1 font-mono text-xs font-semibold text-stamp">
+                    {formatInTimeZone(startDate as Date, timezone, 'h:mma')} – {formatInTimeZone(endDate as Date, timezone, 'h:mma')}
+                  </p>
+                  <p className="mt-1 text-[11px] text-ink/45">{timezone}</p>
+                </div>
+              </div>
+              {(inviteeName || inviteeEmail) && (
+                <div className="mt-3 border-t border-clay/30 pt-3 text-xs text-ink/60">
+                  {inviteeName && <p><span className="font-semibold text-ink">Invitee:</span> {inviteeName}</p>}
+                  {inviteeEmail && <p className="mt-1"><span className="font-semibold text-ink">Email:</span> {inviteeEmail}</p>}
+                </div>
+              )}
             </div>
           )}
 
-          {/* CTA Buttons */}
-          <div className="flex items-center justify-center gap-3 flex-wrap mb-6">
+          <div className="mt-7 flex flex-wrap justify-center gap-3">
             <button
+              type="button"
               onClick={() => router.push(`/${username}`)}
-              className="inline-flex min-h-11 items-center rounded-sm border-2 border-ink px-6 py-2 text-[14px] font-display font-semibold tracking-wide font-bold text-ink/80 transition-colors hover:bg-clay/5"
+              className="inline-flex min-h-11 items-center justify-center border-2 border-ink px-5 py-2 font-display text-sm font-bold uppercase tracking-wider text-ink transition-colors hover:bg-clay/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-stamp"
             >
-              Schedule another event
+              Schedule another
             </button>
             <button
+              type="button"
               onClick={() => {
                 const link = `${window.location.origin}/${username}/${slug}`;
                 navigator.clipboard.writeText(link);
-                showAlert('Success', 'Link copied to clipboard!');
+                showAlert('Link copied', 'Your booking link is ready to share.');
               }}
-              className="inline-flex min-h-11 items-center gap-2 rounded-sm border border-stamp border-2 px-6 py-2 text-[14px] font-display font-semibold tracking-wide font-bold text-stamp transition-colors hover:bg-stamp hover:text-paper"
+              className="inline-flex min-h-11 items-center justify-center gap-2 border-2 border-stamp px-5 py-2 font-display text-sm font-bold uppercase tracking-wider text-stamp transition-colors hover:bg-stamp hover:text-paper focus:outline-none focus-visible:ring-2 focus-visible:ring-stamp"
             >
-              <span className="material-symbols-outlined text-[16px]">link</span>
-              Share booking link
+              <span className="material-symbols-outlined text-[17px]">link</span>
+              Share link
             </button>
           </div>
 
           {uid && (
-            <div className="mb-6 rounded-sm border border-stamp border-2 bg-stamp/5 p-4 text-left">
-              <h3 className="text-[14px] font-display font-semibold tracking-wide font-bold text-stamp mb-2">Need to make a change?</h3>
-              <p className="text-[12px] font-medium text-ink/70 mb-3">
-                Keep this link safe. You can use it to cancel or reschedule this meeting at any time.
-              </p>
-              <div className="flex items-center gap-2">
-                <input 
-                  readOnly 
+            <div className="mt-7 border-2 border-stamp bg-stamp/5 p-5">
+              <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-stamp">Need to make a change?</p>
+              <h3 className="mt-1 font-display text-base font-bold text-ink">Reschedule this meeting</h3>
+              <p className="mt-1 text-xs leading-5 text-ink/60">Keep this private link safe. It can be used to choose another time.</p>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <input
+                  readOnly
                   value={typeof window !== 'undefined' ? `${window.location.origin}/reschedule/${uid}` : ''}
-                  className="flex-1 bg-paper border-2 border-ink px-3 py-2 text-[12px] font-mono text-ink/70 focus:outline-none"
+                  className="min-w-0 flex-1 border-2 border-ink bg-paper px-3 py-2 font-mono text-[11px] text-ink/70 focus:outline-none focus:ring-2 focus:ring-stamp"
+                  aria-label="Reschedule link"
                 />
-                <button 
+                <button
+                  type="button"
                   onClick={() => {
                     navigator.clipboard.writeText(`${window.location.origin}/reschedule/${uid}`);
-                    showAlert('Success', 'Reschedule link copied!');
+                    showAlert('Link copied', 'The reschedule link has been copied.');
                   }}
-                  className="px-4 py-2 bg-stamp text-paper text-[12px] font-display font-semibold tracking-wide font-bold border-2 border-transparent transition-colors hover:bg-blue-700"
+                  className="inline-flex min-h-10 items-center justify-center border-2 border-ink bg-ink px-4 py-2 font-display text-xs font-bold uppercase tracking-wider text-paper transition-colors hover:bg-ink/90"
                 >
                   Copy
                 </button>
@@ -140,31 +212,34 @@ export default function SuccessPage() {
             </div>
           )}
 
-          {/* Calendar Integration */}
-          <div className="mt-8 pt-6 border-t border-ink border-2">
-            <p className="text-[12px] font-medium text-ink/70 mb-3">Add to your calendar:</p>
-            <div className="flex items-center justify-center gap-3">
-              <button className="flex h-11 w-11 items-center justify-center rounded-sm border-2 border-ink transition-colors hover:bg-clay/5">
-                <span className="material-symbols-outlined text-[18px] text-ink/70">calendar_month</span>
+          <div className="mt-8 border-t-2 border-ink pt-6 text-center">
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-ink/45">Add to your calendar</p>
+            <div className="mt-3 flex justify-center gap-3">
+              <button
+                type="button"
+                onClick={addToCalendar}
+                disabled={!hasMeetingDetails}
+                title={hasMeetingDetails ? 'Download calendar event' : 'Calendar details unavailable'}
+                aria-label="Add meeting to calendar"
+                className="inline-flex h-11 w-11 items-center justify-center border-2 border-ink text-ink/70 transition-colors hover:bg-clay/5 disabled:pointer-events-none disabled:opacity-40"
+              >
+                <span className="material-symbols-outlined text-[18px]">calendar_month</span>
               </button>
-              <button className="flex h-11 w-11 items-center justify-center rounded-sm border-2 border-ink transition-colors hover:bg-clay/5">
-                <span className="material-symbols-outlined text-[18px] text-ink/70">mail</span>
+              <button
+                type="button"
+                onClick={emailMeetingDetails}
+                title="Email meeting details"
+                aria-label="Email meeting details"
+                className="inline-flex h-11 w-11 items-center justify-center border-2 border-ink text-ink/70 transition-colors hover:bg-clay/5"
+              >
+                <span className="material-symbols-outlined text-[18px]">mail</span>
               </button>
             </div>
           </div>
-
-          {/* Footer */}
-          <div className="mt-8 pt-6 border-t border-ink border-2">
-          </div>
         </div>
-      </div>
+      </PublicBookingMain>
 
-      <AlertDialog
-        isOpen={alertInfo.isOpen}
-        title={alertInfo.title}
-        message={alertInfo.message}
-        onClose={closeAlert}
-      />
-    </div>
+      <AlertDialog isOpen={alertInfo.isOpen} title={alertInfo.title} message={alertInfo.message} onClose={closeAlert} />
+    </PublicBookingShell>
   );
 }

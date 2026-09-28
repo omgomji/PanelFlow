@@ -12,7 +12,7 @@ import { prisma } from '../config/prisma';
 
 beforeAll(async () => {
   try {
-    execSync('npx prisma db push --accept-data-loss', { 
+    execSync('npx prisma migrate deploy', { 
       stdio: 'ignore',
       env: { ...process.env, DATABASE_URL: testDbUrl }
     });

@@ -2,19 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { getAvailability, getEventTypes, updateAvailability } from '@/lib/api';
+import { getAvailability, updateAvailability } from '@/lib/api';
 import type {
   AvailabilityDateOverridePayload,
   AvailabilitySchedule,
 } from '@/types/availability';
-import type { EventType } from '@/types/event-types';
 import { addMonths, endOfMonth, format, startOfMonth, subMonths } from 'date-fns';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const FULL_DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const DATE_KEY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
-type AvailabilityTab = 'Schedules' | 'Calendar settings' | 'Advanced settings';
+type AvailabilityTab = 'Schedules' | 'Advanced settings';
 
 type AvailabilityDay = {
   dayOfWeek: number;
@@ -34,7 +33,7 @@ export default function AvailabilityPage() {
   const [activeMainTab, setActiveMainTab] = useState<AvailabilityTab>('Schedules');
   const [viewMode, setViewMode] = useState<'List' | 'Calendar'>('List');
   const [availability, setAvailability] = useState<AvailabilityDay[]>([]);
-  const [timezone, setTimezone] = useState('Asia/Kolkata');
+  const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -43,11 +42,6 @@ export default function AvailabilityPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [dateOverrides, setDateOverrides] = useState<AvailabilityDateOverridePayload[]>([]);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(null);
-  const [showWorkingHoursModal, setShowWorkingHoursModal] = useState(false);
-  const [showActiveOnModal, setShowActiveOnModal] = useState(false);
-  const [eventTypes, setEventTypes] = useState<EventType[]>([]);
-  const [selectedEventTypes, setSelectedEventTypes] = useState<number[]>([]);
-  const [loadingEventTypes, setLoadingEventTypes] = useState(true);
   const [showTimeDropdown, setShowTimeDropdown] = useState<{ dayId: number; intervalIndex: number; type: 'start' | 'end' } | null>(null);
   const [showDateOverrideTimeDropdown, setShowDateOverrideTimeDropdown] =
     useState<DateOverrideTimeDropdownState | null>(null);
@@ -97,17 +91,6 @@ export default function AvailabilityPage() {
 
   const timeOptions = generateTimeOptions();
 
-  const [calendarSettings, setCalendarSettings] = useState({
-    checkConflicts: true,
-    autoAddEvents: true,
-    markAsBusy: true,
-    conflictCalendar: 'Google - alex@orchestrator.io',
-    connectedCalendars: [
-      { id: 'g-main', name: 'Google - alex@orchestrator.io', type: 'Google Calendar', status: 'Connected' },
-      { id: 'o-work', name: 'Outlook - team@orchestrator.io', type: 'Outlook', status: 'Connected' },
-    ],
-  });
-
   const [advancedSettings, setAdvancedSettings] = useState({
     beforeEventBuffer: '15',
     afterEventBuffer: '15',
@@ -117,11 +100,10 @@ export default function AvailabilityPage() {
     allowBackToBack: true,
   });
 
-  const mainTabs: AvailabilityTab[] = ['Schedules', 'Calendar settings', 'Advanced settings'];
+  const mainTabs: AvailabilityTab[] = ['Schedules', 'Advanced settings'];
 
   useEffect(() => {
     fetchAvailability();
-    fetchEventTypes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -229,23 +211,6 @@ export default function AvailabilityPage() {
     };
   }, [showTimezoneDropdown]);
 
-  const fetchEventTypes = async () => {
-    try {
-      setLoadingEventTypes(true);
-      const eventTypesArray = await getEventTypes();
-      setEventTypes(eventTypesArray);
-      
-      // Initialize with all event types selected
-      if (eventTypesArray.length > 0) {
-        setSelectedEventTypes(eventTypesArray.map((et: EventType) => et.id));
-      }
-    } catch (error) {
-      console.error('Error fetching event types:', error);
-      setEventTypes([]);
-    } finally {
-      setLoadingEventTypes(false);
-    }
-  };
 
   const normalizeDateKey = (value: string | Date) => {
     if (value instanceof Date) {
@@ -1592,86 +1557,6 @@ export default function AvailabilityPage() {
     );
   };
 
-  const renderCalendarSettings = () => (
-    <div className="flex flex-col">
-      <div className="border-b-2 border-ink p-5">
-        <h2 className="text-[14px] font-display font-semibold tracking-wide font-bold text-ink">Connected calendars</h2>
-        <p className="mt-1 text-[11px] text-ink/60">Choose which calendars should be checked for conflicts.</p>
-
-        <div className="mt-4 space-y-2">
-          {calendarSettings.connectedCalendars.map((calendar) => (
-            <div key={calendar.id} className="flex items-center justify-between rounded-sm border-2 border-ink px-3 py-2">
-              <div>
-                <p className="text-[12px] font-medium font-bold text-ink/90">{calendar.name}</p>
-                <p className="text-[10px] text-ink/60">{calendar.type}</p>
-              </div>
-              <span className="rounded-sm bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-sage">{calendar.status}</span>
-            </div>
-          ))}
-        </div>
-
-        <button
-          type="button"
-          className="mt-4 inline-flex items-center gap-1 rounded-sm border-2 border-ink px-3 py-1.5 text-[11px] font-bold text-ink/80 hover:bg-clay/5"
-        >
-          <span className="material-symbols-outlined text-[14px] font-display font-semibold tracking-wide">add</span>
-          Connect calendar
-        </button>
-      </div>
-
-      <div className="p-5">
-        <h2 className="text-[14px] font-display font-semibold tracking-wide font-bold text-ink">Conflict checks</h2>
-
-        <div className="mt-4 space-y-3">
-          <label className="flex items-center justify-between rounded-sm border-2 border-ink px-3 py-2">
-            <span className="text-[12px] font-medium text-ink/80">Check connected calendars for conflicts</span>
-            <input
-              type="checkbox"
-              checked={calendarSettings.checkConflicts}
-              onChange={(event) => setCalendarSettings((prev) => ({ ...prev, checkConflicts: event.target.checked }))}
-              className="h-4 w-4 rounded border-ink border-2 text-stamp"
-            />
-          </label>
-
-          <label className="flex items-center justify-between rounded-sm border-2 border-ink px-3 py-2">
-            <span className="text-[12px] font-medium text-ink/80">Add events to selected calendar automatically</span>
-            <input
-              type="checkbox"
-              checked={calendarSettings.autoAddEvents}
-              onChange={(event) => setCalendarSettings((prev) => ({ ...prev, autoAddEvents: event.target.checked }))}
-              className="h-4 w-4 rounded border-ink border-2 text-stamp"
-            />
-          </label>
-
-          <label className="flex items-center justify-between rounded-sm border-2 border-ink px-3 py-2">
-            <span className="text-[12px] font-medium text-ink/80">Mark booked events as busy</span>
-            <input
-              type="checkbox"
-              checked={calendarSettings.markAsBusy}
-              onChange={(event) => setCalendarSettings((prev) => ({ ...prev, markAsBusy: event.target.checked }))}
-              className="h-4 w-4 rounded border-ink border-2 text-stamp"
-            />
-          </label>
-        </div>
-
-        <div className="mt-4">
-          <label className="mb-1 block text-[11px] font-bold text-ink/80">Calendar used for conflict checks</label>
-          <select
-            value={calendarSettings.conflictCalendar}
-            onChange={(event) => setCalendarSettings((prev) => ({ ...prev, conflictCalendar: event.target.value }))}
-            className="w-full rounded-sm border-2 border-ink bg-paper px-3 py-2 text-[12px] font-medium text-ink/80 focus:border-stamp border-2 focus:outline-none"
-          >
-            {calendarSettings.connectedCalendars.map((calendar) => (
-              <option key={calendar.id} value={calendar.name}>
-                {calendar.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-    </div>
-  );
-
   const renderAdvancedSettings = () => (
     <div className="flex flex-col gap-5">
       <div className="rounded-sm border-2 border-ink bg-paper p-5">
@@ -1802,184 +1687,6 @@ export default function AvailabilityPage() {
     </div>
   );
 
-  const renderWorkingHoursModal = () => (
-    <>
-      {showWorkingHoursModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center sm:justify-center bg-black/50 px-4 py-4">
-          <div className="w-full max-w-sm rounded-sm border-2 border-ink bg-paper sm:rounded-sm">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b-2 border-ink px-5 py-4 sm:px-6">
-              <h2 className="text-[16px] font-bold text-ink">Working hours</h2>
-              <button
-                type="button"
-                onClick={() => setShowWorkingHoursModal(false)}
-                className="inline-flex h-6 w-6 items-center justify-center rounded text-ink/60 hover:bg-clay/10"
-              >
-                <span className="material-symbols-outlined text-[20px] font-display font-semibold tracking-wide">close</span>
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="max-h-[60vh] overflow-y-auto space-y-2 px-5 py-4 sm:px-6">
-              <label className="flex items-center gap-3 cursor-pointer rounded-sm p-2 hover:bg-clay/5">
-                <input type="radio" name="workingHours" defaultChecked className="h-4 w-4" />
-                <div>
-                  <p className="text-[12px] font-medium font-bold text-ink">Working hours (default)</p>
-                  <p className="text-[10px] text-ink/60">Mon-Fri 9am-5pm</p>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-3 cursor-pointer rounded-sm p-2 hover:bg-clay/5">
-                <input type="radio" name="workingHours" className="h-4 w-4" />
-                <div>
-                  <p className="text-[12px] font-medium font-bold text-ink">Weekend availability</p>
-                  <p className="text-[10px] text-ink/60">Custom schedule</p>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-3 cursor-pointer rounded-sm p-2 hover:bg-clay/5">
-                <input type="radio" name="workingHours" className="h-4 w-4" />
-                <div>
-                  <p className="text-[12px] font-medium font-bold text-ink">Holiday hours</p>
-                  <p className="text-[10px] text-ink/60">Custom schedule</p>
-                </div>
-              </label>
-
-              <div className="border-t-2 border-ink pt-2 mt-2">
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 rounded-sm p-2 text-[12px] font-medium font-bold text-ink/80 hover:bg-clay/5"
-                >
-                  <span className="material-symbols-outlined text-[16px]">add</span>
-                  Create schedule
-                </button>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="flex flex-col gap-2 border-t-2 border-ink px-5 py-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-6">
-              <button
-                type="button"
-                onClick={() => setShowWorkingHoursModal(false)}
-                className="rounded-sm border-2 border-ink px-4 py-2 text-[13px] font-medium font-bold text-ink/80 hover:bg-clay/5"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="rounded-sm bg-stamp px-4 py-2 text-[13px] font-medium font-bold text-paper hover:bg-blue-700"
-              >
-                Apply
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-
-  const renderActiveOnModal = () => (
-    <>
-      {showActiveOnModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center sm:justify-center bg-black/50 px-4 py-4">
-          <div className="w-full max-w-md rounded-sm border-2 border-ink bg-paper sm:rounded-sm">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b-2 border-ink px-5 py-4 sm:px-6">
-              <h2 className="text-[16px] font-bold text-ink">Active on</h2>
-              <button
-                type="button"
-                onClick={() => setShowActiveOnModal(false)}
-                className="inline-flex h-6 w-6 items-center justify-center rounded text-ink/60 hover:bg-clay/10"
-              >
-                <span className="material-symbols-outlined text-[20px] font-display font-semibold tracking-wide">close</span>
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="max-h-[60vh] overflow-y-auto px-5 py-4 sm:px-6">
-              {loadingEventTypes ? (
-                <div className="flex justify-center py-8">
-                  <div className="h-6 w-6 animate-spin rounded-sm border-b-2 border-stamp border-2" />
-                </div>
-              ) : (
-                <>
-                  <div className="mb-3">
-                    <div className="flex items-center justify-between gap-2 pb-2">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedEventTypes(eventTypes.map(et => et.id))}
-                        className="text-[12px] font-medium font-bold text-stamp hover:underline"
-                      >
-                        select all
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedEventTypes([])}
-                        className="text-[12px] font-medium font-bold text-stamp hover:underline"
-                      >
-                        clear
-                      </button>
-                    </div>
-                  </div>
-
-                  {eventTypes.length === 0 ? (
-                    <div className="rounded-sm border border-dashed border-ink border-2 bg-clay/5 p-3 text-center">
-                      <p className="text-[12px] font-medium text-ink/60">No meeting types available</p>
-                    </div>
-                  ) : (
-                    <div className="mb-4 space-y-2">
-                      <div className="rounded-sm border-2 border-ink bg-clay/5 px-3 py-2">
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-ink/60 mb-3">Meeting types</p>
-                        <div className="space-y-2">
-                          {eventTypes.map((eventType) => (
-                            <label key={eventType.id} className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={selectedEventTypes.includes(eventType.id)}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedEventTypes([...selectedEventTypes, eventType.id]);
-                                  } else {
-                                    setSelectedEventTypes(selectedEventTypes.filter(id => id !== eventType.id));
-                                  }
-                                }}
-                                className="h-4 w-4 rounded"
-                              />
-                              <span className="text-[12px] font-medium text-ink/80">{eventType.title}</span>
-                              <span className="text-[11px] text-ink/60 ml-auto">{eventType.duration} mins</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="flex flex-col gap-2 border-t-2 border-ink px-5 py-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-6">
-              <button
-                type="button"
-                onClick={() => setShowActiveOnModal(false)}
-                className="rounded-sm border-2 border-ink px-4 py-2 text-[13px] font-medium font-bold text-ink/80 hover:bg-clay/5"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowActiveOnModal(false)}
-                className="rounded-sm bg-stamp px-4 py-2 text-[13px] font-medium font-bold text-paper hover:bg-blue-700"
-              >
-                Apply
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-
   return (
     <div className="pb-16 pt-4">
       <div className="mb-4 flex items-center gap-2">
@@ -2013,26 +1720,7 @@ export default function AvailabilityPage() {
             <p className="text-[10px] font-bold uppercase tracking-wide text-ink/60">This schedule</p>
             <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowWorkingHoursModal(true)}
-                  className="inline-flex items-center gap-1 text-[14px] font-display font-semibold tracking-wide font-bold text-stamp hover:text-blue-700 transition-colors"
-                >
-                  Working hours (default)
-                  <span className="material-symbols-outlined text-[16px] text-ink/60">keyboard_arrow_down</span>
-                </button>
 
-                <div className="flex flex-wrap items-center gap-1 text-[11px] text-ink/60">
-                  <span>Active on</span>
-                  <button 
-                    type="button" 
-                    onClick={() => setShowActiveOnModal(true)}
-                    className="inline-flex items-center gap-1 font-bold text-ink/80 hover:text-ink transition-colors"
-                  >
-                    {selectedEventTypes.length} {selectedEventTypes.length === 1 ? 'event type' : 'event types'}
-                    <span className="material-symbols-outlined text-[14px] font-display font-semibold tracking-wide text-ink/60">keyboard_arrow_down</span>
-                  </button>
-                </div>
               </div>
 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
@@ -2059,13 +1747,6 @@ export default function AvailabilityPage() {
                   </button>
                 </div>
 
-                <button
-                  type="button"
-                  aria-label="Working hours settings"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-sm border-2 border-ink text-ink/70 hover:bg-clay/5 sm:h-7 sm:w-7"
-                >
-                  <span className="material-symbols-outlined text-[16px]">more_horiz</span>
-                </button>
               </div>
             </div>
           </div>
@@ -2122,11 +1803,8 @@ export default function AvailabilityPage() {
         </div>
       )}
 
-      {activeMainTab === 'Calendar settings' && renderCalendarSettings()}
       {activeMainTab === 'Advanced settings' && renderAdvancedSettings()}
       </div>
-      {renderWorkingHoursModal()}
-      {renderActiveOnModal()}
     </div>
   );
 }

@@ -7,6 +7,15 @@ import { createBooking, getPublicEventDetails } from '@/lib/api';
 import { formatInTimeZone } from 'date-fns-tz';
 import type { PublicEventData } from '@/types/public';
 import { AlertDialog } from '@/components/ui/AlertDialog';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import {
+  PublicBookingHeader,
+  PublicBookingMain,
+  PublicBookingShell,
+  PublicLoadingState,
+  PublicStateCard,
+} from '@/components/PublicBookingLayout';
 
 export default function BookingDetailsPage() {
   const { username, slug } = useParams<{ username: string; slug: string }>();
@@ -22,7 +31,7 @@ export default function BookingDetailsPage() {
 
   const [alertInfo, setAlertInfo] = useState({ isOpen: false, title: '', message: '' });
   const showAlert = (title: string, message: string) => setAlertInfo({ isOpen: true, title, message });
-  const closeAlert = () => setAlertInfo(prev => ({ ...prev, isOpen: false }));
+  const closeAlert = () => setAlertInfo((prev) => ({ ...prev, isOpen: false }));
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -56,9 +65,8 @@ export default function BookingDetailsPage() {
     e.preventDefault();
     setSubmitting(true);
 
-    const selectedStartTime = timeParam;
-    if (!selectedStartTime) {
-      showAlert('Error', 'Invalid booking details');
+    if (!timeParam) {
+      showAlert('Booking error', 'Invalid booking details. Please choose a time again.');
       setSubmitting(false);
       return;
     }
@@ -67,7 +75,7 @@ export default function BookingDetailsPage() {
       const booking = await createBooking(username, slug, {
         inviteeName: name,
         inviteeEmail: email,
-        startTime: selectedStartTime,
+        startTime: timeParam,
         notes,
       });
 
@@ -86,172 +94,142 @@ export default function BookingDetailsPage() {
       console.error('Error booking:', err);
 
       if (axios.isAxiosError(err) && err.response?.status === 409) {
-        showAlert('Error', 'This slot was just booked by someone else. Please choose another time.');
+        showAlert('Slot unavailable', 'This slot was just booked by someone else. Please choose another time.');
         router.replace(`/${username}/${slug}`);
         return;
       }
 
-      showAlert('Error', 'Failed to book meeting. Please try again.');
+      showAlert('Booking error', 'Failed to book the meeting. Please try again.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-clay/5 flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-sm border-b-2 border-stamp border-2" />
-      </div>
-    );
-  }
+  if (loading) return <PublicLoadingState />;
 
   if (error || !eventData || !dateParam || !timeParam) {
     return (
-      <div className="min-h-screen bg-clay/5 flex items-center justify-center">
-        <div className="text-red-500 font-medium">{error || 'Invalid booking details'}</div>
-      </div>
+      <PublicBookingShell>
+        <PublicBookingHeader backHref={`/${username}/${slug}`} backLabel="Back to availability" />
+        <PublicBookingMain className="flex min-h-[70vh] items-center justify-center">
+          <PublicStateCard icon="event_busy" title="Booking unavailable" message={error || 'Invalid booking details'} tone="danger" />
+        </PublicBookingMain>
+      </PublicBookingShell>
     );
   }
 
   const { eventType, user } = eventData;
   const selectedTime = new Date(timeParam);
+  const selectedEnd = new Date(selectedTime.getTime() + eventType.duration * 60000);
 
   return (
-    <div className="min-h-screen bg-clay/5">
-      {/* Header */}
-      <div className="bg-paper border-b border-ink border-2">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <span className="text-[12px] font-medium font-medium text-ink/60 uppercase">PanelFlow</span>
-        </div>
-      </div>
+    <PublicBookingShell>
+      <PublicBookingHeader backHref={`/${username}/${slug}`} backLabel="Back to availability" rightLabel="Enter your details" />
 
-      {/* Main Content */}
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        <div className="bg-paper rounded-sm border-2 border-ink overflow-hidden shadow-200">
-          <div className="grid grid-cols-1 md:grid-cols-3 md:min-h-[600px] relative">
-            {/* Left Panel - Event Details */}
-            <div className="border-b border-ink border-2 p-4 sm:p-6 md:border-b-0 md:border-r">
-              <button
-                onClick={() => router.back()}
-                className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-sm transition-colors hover:bg-clay/10"
-              >
-                <span className="material-symbols-outlined text-[20px] font-display font-semibold tracking-wide text-stamp">arrow_back</span>
-              </button>
+      <PublicBookingMain>
+        <div className="border-2 border-ink bg-paper shadow-[8px_8px_0_var(--accent-clay)]">
+          <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] lg:grid-cols-[310px_1fr]">
+            <aside className="border-b-2 border-ink p-5 sm:p-7 md:border-b-0 md:border-r-2">
+              <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-stamp">Your appointment</p>
+              <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-ink sm:text-[28px]">{eventType.title}</h1>
+              <p className="mt-1 text-sm text-ink/55">with {user.name}</p>
 
-              <div className="text-[12px] font-medium font-medium text-ink/60 uppercase tracking-wide mb-1">
-                {user.name}
-              </div>
-              <h1 className="text-[28px] font-bold text-ink mb-4">{eventType.title}</h1>
-
-              <div className="flex items-center gap-2 mb-2">
-                <span className="material-symbols-outlined text-[18px] text-ink/60">schedule</span>
-                <span className="text-[14px] font-display font-semibold tracking-wide font-medium text-ink/80">{eventType.duration} min</span>
-              </div>
-
-              <div className="mt-6 space-y-3 text-[13px] font-medium">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[18px] text-ink/60">event</span>
-                  <span className="text-ink/80 font-medium">
-                    {formatInTimeZone(selectedTime, inviteeTimeZone, 'h:mma')} - {formatInTimeZone(new Date(selectedTime.getTime() + eventType.duration * 60000), inviteeTimeZone, 'h:mma')}, {formatInTimeZone(selectedTime, inviteeTimeZone, 'EEEE, MMMM d, yyyy')}
-                  </span>
+              <div className="mt-6 space-y-3 border-y border-clay/30 py-5 text-sm text-ink/70">
+                <div className="flex items-start gap-3">
+                  <span className="material-symbols-outlined mt-0.5 text-[18px] text-stamp">event</span>
+                  <div>
+                    <p className="font-semibold text-ink">{formatInTimeZone(selectedTime, inviteeTimeZone, 'EEEE, MMMM d, yyyy')}</p>
+                    <p className="mt-1 font-mono text-xs text-ink/55">
+                      {formatInTimeZone(selectedTime, inviteeTimeZone, 'h:mma')} – {formatInTimeZone(selectedEnd, inviteeTimeZone, 'h:mma')}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[18px] text-ink/60">public</span>
-                  <span className="text-ink/80 font-medium">{inviteeTimeZone}</span>
+                <div className="flex items-start gap-3">
+                  <span className="material-symbols-outlined mt-0.5 text-[18px] text-stamp">public</span>
+                  <div>
+                    <p className="font-semibold text-ink">{inviteeTimeZone}</p>
+                    <p className="mt-1 text-xs text-ink/50">Timezone detected from your browser.</p>
+                  </div>
                 </div>
               </div>
 
-              <div className="mt-8 pt-6 border-t border-ink border-2">
+              <div className="mt-6">
+                <p className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-ink/45">Duration</p>
+                <p className="font-display text-sm font-bold text-ink">{eventType.duration} minutes</p>
               </div>
-            </div>
+            </aside>
 
-            {/* Right Panel - Form */}
-            <div className="p-4 sm:p-6 md:col-span-2">
-              <h2 className="text-[18px] font-bold text-ink mb-6">Enter Details</h2>
+            <section className="p-5 sm:p-7 lg:p-8">
+              <div className="mb-7 border-b-2 border-ink pb-4">
+                <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-stamp">Step 2 of 2</p>
+                <h2 className="mt-1 font-display text-xl font-bold tracking-tight text-ink">Your details</h2>
+                <p className="mt-1 text-sm text-ink/55">Tell {user.name} who is joining the meeting.</p>
+              </div>
 
-              <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Name */}
+              <form onSubmit={handleSubmit} className="max-w-xl space-y-6">
                 <div>
-                  <label className="block text-[13px] font-medium font-bold text-ink mb-2">
-                    Name <span className="text-red-500">*</span>
+                  <label htmlFor="booking-name" className="mb-2 block font-display text-sm font-bold uppercase tracking-wider text-ink/70">
+                    Name <span className="text-oxblood">*</span>
                   </label>
-                  <input
+                  <Input
+                    id="booking-name"
                     type="text"
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full px-4 py-2 border-2 border-ink rounded-sm text-[14px] font-display font-semibold tracking-wide focus:outline-none focus:border-stamp border-2"
                     placeholder="Your name"
+                    autoComplete="name"
+                    className="h-11 border-2 border-ink"
                   />
                 </div>
 
-                {/* Email */}
                 <div>
-                  <label className="block text-[13px] font-medium font-bold text-ink mb-2">
-                    Email <span className="text-red-500">*</span>
+                  <label htmlFor="booking-email" className="mb-2 block font-display text-sm font-bold uppercase tracking-wider text-ink/70">
+                    Email address <span className="text-oxblood">*</span>
                   </label>
-                  <input
+                  <Input
+                    id="booking-email"
                     type="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-2 border-2 border-ink rounded-sm text-[14px] font-display font-semibold tracking-wide focus:outline-none focus:border-stamp border-2"
-                    placeholder="your@email.com"
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                    className="h-11 border-2 border-ink"
                   />
                 </div>
 
-                {/* Add Guests */}
                 <div>
-                  <button
-                    type="button"
-                    className="inline-flex h-10 items-center rounded-sm border border-stamp border-2 px-4 text-[12px] font-medium font-bold text-stamp transition-colors hover:bg-stamp hover:text-paper"
-                  >
-                    Add Guests
-                  </button>
-                </div>
-
-                {/* Notes */}
-                <div>
-                  <label className="block text-[13px] font-medium font-bold text-ink mb-2">
-                    Please share anything that will help prepare for our meeting.
+                  <label htmlFor="booking-notes" className="mb-2 block font-display text-sm font-bold uppercase tracking-wider text-ink/70">
+                    Notes <span className="font-mono text-[10px] font-normal normal-case tracking-normal text-ink/45">(optional)</span>
                   </label>
                   <textarea
+                    id="booking-notes"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    className="w-full px-4 py-2 border-2 border-ink rounded-sm text-[14px] font-display font-semibold tracking-wide focus:outline-none focus:border-stamp border-2"
-                    rows={4}
-                    placeholder="Additional notes..."
+                    rows={5}
+                    placeholder="Anything that will help prepare for the meeting..."
+                    className="w-full resize-y border-2 border-ink bg-paper px-3 py-3 text-sm text-ink placeholder:text-ink/35 focus:outline-none focus:ring-2 focus:ring-stamp focus:ring-offset-1"
                   />
                 </div>
 
-                {/* Terms */}
-                <div className="text-[12px] font-medium text-ink/70">
-                  By proceeding, you confirm that you have read and agree to PanelFlow&apos;s{' '}
-                  <button type="button" className="text-stamp font-bold hover:underline">
-                    Terms of Use
-                  </button>
-                  {' '}and{' '}
-                  <button type="button" className="text-stamp font-bold hover:underline">
-                    Privacy Notice
-                  </button>
-                  .
-                </div>
-
-                {/* Submit Button */}
-                <div className="pt-4">
-                  <button
+                <div className="border-t border-clay/30 pt-5">
+                  <Button
                     type="submit"
                     disabled={submitting}
-                    className="min-h-11 w-full rounded-sm bg-stamp px-4 py-2 text-[14px] font-display font-semibold tracking-wide font-bold text-paper transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="min-h-11 w-full text-sm font-bold uppercase tracking-widest"
                   >
-                    {submitting ? 'Scheduling...' : 'Schedule Event'}
-                  </button>
+                    {submitting ? 'Scheduling…' : 'Schedule meeting'}
+                  </Button>
+                  <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-wider text-ink/45">
+                    Your information is only used to create this appointment.
+                  </p>
                 </div>
               </form>
-            </div>
+            </section>
           </div>
         </div>
-      </div>
+      </PublicBookingMain>
 
       <AlertDialog
         isOpen={alertInfo.isOpen}
@@ -259,6 +237,6 @@ export default function BookingDetailsPage() {
         message={alertInfo.message}
         onClose={closeAlert}
       />
-    </div>
+    </PublicBookingShell>
   );
 }

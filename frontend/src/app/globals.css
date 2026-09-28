@@ -7,6 +7,9 @@
   --color-sage: var(--accent-sage);
   --color-oxblood: var(--accent-oxblood);
   --color-clay: var(--accent-clay);
+  --color-primary: var(--brand-stamp);
+  --color-pine: var(--accent-sage);
+  --color-surface: var(--bg-paper);
   
   --font-display: "Space Grotesk", sans-serif;
   --font-body: "IBM Plex Sans", sans-serif;

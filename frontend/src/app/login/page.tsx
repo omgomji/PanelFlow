@@ -62,7 +62,7 @@ function LoginForm() {
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         const msg = (err.response?.data as { error?: string } | undefined)?.error;
-        setError(msg || 'Invalid email or password');
+        setError(msg || (err.response ? 'Login failed. Please try again.' : 'Cannot reach the backend server.'));
       } else {
         setError('Something went wrong. Please try again.');
       }
@@ -161,6 +161,7 @@ function LoginForm() {
               </p>
               
               <Button
+                type="button"
                 variant="secondary"
                 size="sm"
                 onClick={() => {

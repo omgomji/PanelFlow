@@ -19,65 +19,9 @@ import { addMinutes, subMinutes } from 'date-fns';
 import { NotFoundError, ConflictError, BadRequestError } from '../utils/errors';
 import { panelSlotsService } from './panelSlots.service';
 import { formatInTimeZone } from 'date-fns-tz';
-import { emailService } from './email.service';
-import { getConfirmationEmail, getCancellationEmail, getRescheduleEmail } from '../emails/templates';
-import { webhookService } from './webhook.service';
-
-interface OldBookingInfo {
-  id: number;
-  uid: string;
-  startTime: Date;
-  endTime: Date;
-  eventType?: { title: string; duration: number } | null;
-  panel?: { title: string; duration: number; interviewers: any[] } | null;
-}
-
-async function postBookingAutomation(action: 'created' | 'cancelled' | 'rescheduled' | 'no_show', bookingId: number, oldBookingInfo?: OldBookingInfo) {
-  try {
-    const booking = await prisma.booking.findUnique({
-      where: { id: bookingId },
-      include: {
-        eventType: true,
-        panel: {
-          include: { position: true }
-        }
-      }
-    });
-    if (!booking) return;
-
-    const hosts = await prisma.bookingHost.findMany({
-      where: { bookingId },
-      include: { user: true }
-    });
-    const hostUsers = hosts.map(h => h.user);
-    
-    let ownerId = booking.userId;
-    if (!ownerId && booking.panelId) {
-      ownerId = booking.panel?.position.createdById || null;
-    }
-
-    if (ownerId) {
-      webhookService.dispatchWebhookEvent(ownerId, `booking.${action}`, booking);
-    }
-
-    if (action === 'no_show') return; // No automated email for no_show
-
-    const toEmails = [booking.inviteeEmail, ...hostUsers.map(h => h.email)];
-
-    if (action === 'created') {
-      const { subject, html } = getConfirmationEmail(booking, hostUsers);
-      emailService.sendEmail(toEmails, subject, html);
-    } else if (action === 'cancelled') {
-      const { subject, html } = getCancellationEmail(booking, hostUsers);
-      emailService.sendEmail(toEmails, subject, html);
-    } else if (action === 'rescheduled' && oldBookingInfo) {
-      const { subject, html } = getRescheduleEmail(oldBookingInfo, booking, hostUsers);
-      emailService.sendEmail(toEmails, subject, html);
-    }
-  } catch (error) {
-    console.error(`Post-booking automation failed for action ${action}:`, error);
-  }
-}
+import { getEffectiveBufferPolicy } from './slots.service';
+import { canManageBooking } from './authorization.service';
+import { indexBooking } from '../ai/indexers/indexer.service';
 
 export const bookingsService = {
   /**
@@ -105,9 +49,7 @@ export const bookingsService = {
     const status = filters?.status;
     const now = new Date();
 
-    const where: Prisma.BookingWhereInput = {
-      eventType: { userId },
-    };
+    const where: Prisma.BookingWhereInput = { OR: [{ eventType: { userId } }, { panel: { position: { createdById: userId } } }] };
 
     if (status === 'upcoming') {
       where.startTime = { gte: now };
@@ -139,6 +81,7 @@ export const bookingsService = {
               { inviteeName: { contains: query, mode: 'insensitive' } },
               { inviteeEmail: { contains: query, mode: 'insensitive' } },
               { eventType: { title: { contains: query, mode: 'insensitive' } } },
+              { panel: { title: { contains: query, mode: 'insensitive' } } },
             ],
           },
         ];
@@ -162,6 +105,7 @@ export const bookingsService = {
           eventType: {
             select: { id: true, title: true, slug: true, duration: true },
           },
+          panel: { select: { id: true, title: true, slug: true, duration: true, position: { select: { id: true, title: true } } } },
         },
         orderBy,
         ...(hasPagination ? { skip, take: limit } : {}),
@@ -231,19 +175,21 @@ export const bookingsService = {
    * Cancels the parent Booking AND all its BookingHost rows in one transaction,
    * freeing the slot for all interviewers simultaneously.
    */
-  async cancel(userId: number, bookingId: number, cancellationReason?: string) {
+  async cancel(userId: number, bookingId: number, cancellationReason?: string, role = 'INTERVIEWER') {
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { eventType: true },
+      include: { eventType: true, panel: { include: { position: true } } },
     });
 
     if (!booking) {
       throw new NotFoundError('Booking not found');
     }
     
-    if (booking.eventTypeId && booking.eventType?.userId !== userId) {
+    const authorized = canManageBooking(userId, role, booking);
+    if (!authorized) {
       throw new NotFoundError('Booking not found');
     }
+    if (booking.status !== 'SCHEDULED') throw new ConflictError('Only scheduled bookings can be cancelled');
 
     const updatedBooking = await prisma.$transaction(async (tx) => {
       await tx.bookingHost.updateMany({
@@ -256,7 +202,9 @@ export const bookingsService = {
       });
     });
 
-    setImmediate(() => postBookingAutomation('cancelled', bookingId));
+    void indexBooking(updatedBooking.id).catch((error) => {
+      console.error('[ai] booking index failed after cancel', { bookingId: updatedBooking.id, error: error instanceof Error ? error.message : String(error) });
+    });
 
     return updatedBooking;
   },
@@ -277,6 +225,8 @@ export const bookingsService = {
     if (!isAdmin && !isHost) {
       throw new ConflictError('Not authorized to mark this booking as no-show');
     }
+    if (booking.status !== 'SCHEDULED') throw new ConflictError('Only scheduled bookings can be marked as no-show');
+    if (booking.endTime > new Date()) throw new ConflictError('A future booking cannot be marked as no-show');
 
     const updatedBooking = await prisma.$transaction(async (tx) => {
       await tx.bookingHost.updateMany({
@@ -289,7 +239,9 @@ export const bookingsService = {
       });
     });
 
-    setImmediate(() => postBookingAutomation('no_show', bookingId));
+    void indexBooking(updatedBooking.id).catch((error) => {
+      console.error('[ai] booking index failed after no-show', { bookingId: updatedBooking.id, error: error instanceof Error ? error.message : String(error) });
+    });
 
     return updatedBooking;
   },
@@ -334,14 +286,16 @@ export const bookingsService = {
       0,
       options?.afterEventBufferMinutes ?? 0
     );
-    const totalBufferWindowMinutes =
-      beforeEventBufferMinutes + afterEventBufferMinutes;
-    const bufferedWindowStartUtc = subMinutes(startUtc, totalBufferWindowMinutes);
-    const bufferedWindowEndUtc = addMinutes(endUtc, totalBufferWindowMinutes);
+    const bufferedWindowStartUtc = subMinutes(startUtc, beforeEventBufferMinutes);
+    const bufferedWindowEndUtc = addMinutes(endUtc, afterEventBufferMinutes);
 
     const result = await prisma.$transaction(async (tx) => {
       // Serialize booking writes per host to avoid race conditions for buffer windows.
       await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
+      const source = await tx.eventType.findUnique({ where: { id: eventTypeId }, include: { user: { include: { availabilitySchedule: true } } } });
+      if (!source || !source.isActive || source.userId !== userId || !source.user.availabilitySchedule) {
+        throw new ConflictError('This time slot is no longer available');
+      }
 
       // Check BookingHost for overlapping SCHEDULED commitments (individual + panel)
       const overlap = await tx.bookingHost.findFirst({
@@ -365,6 +319,7 @@ export const bookingsService = {
           inviteeEmail: data.inviteeEmail,
           startTime: startUtc,
           endTime: endUtc,
+          durationMinutes: duration,
           status: 'SCHEDULED',
         },
       });
@@ -379,11 +334,13 @@ export const bookingsService = {
           status: 'SCHEDULED',
         },
       });
-
       return booking;
     });
-    
-    setImmediate(() => postBookingAutomation('created', result.id));
+
+    void indexBooking(result.id).catch((error) => {
+      console.error('[ai] booking index failed after create', { bookingId: result.id, error: error instanceof Error ? error.message : String(error) });
+    });
+
     return result;
   },
 
@@ -400,17 +357,17 @@ export const bookingsService = {
    */
   async createPanelBooking(
     panelSlug: string,
-    data: { inviteeName: string; inviteeEmail: string; startTime: string }
+    data: { inviteeName: string; inviteeEmail: string; startTime: string; timezone: string }
   ) {
     const panel = await prisma.panel.findUnique({
       where: { slug: panelSlug },
       include: {
         interviewers: true,
-        position: { select: { title: true } },
+        position: { select: { title: true, status: true } },
       },
     });
 
-    if (!panel || !panel.isActive) {
+    if (!panel || !panel.isActive || panel.position.status !== 'OPEN') {
       throw new NotFoundError('Panel not found');
     }
 
@@ -428,20 +385,21 @@ export const bookingsService = {
     // panelId will be set; eventTypeId and userId will be null.
 
     const result = await prisma.$transaction(async (tx) => {
+      const currentPanel = await tx.panel.findUnique({ where: { slug: panelSlug }, include: { position: true, interviewers: true } });
+      if (!currentPanel || !currentPanel.isActive || currentPanel.position.status !== 'OPEN' || !currentPanel.interviewers.length) throw new ConflictError('This time slot is no longer available');
       // Lock all panel interviewer user rows to serialize concurrent panel bookings
-      const interviewerIds = panel.interviewers.map((pi) => pi.userId).sort();
+      const interviewerIds = currentPanel.interviewers.map((pi) => pi.userId).sort();
       for (const uid of interviewerIds) {
         await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${uid} FOR UPDATE`;
       }
 
       // Re-validate availability for every panel interviewer (race-condition defence)
-      for (const pi of panel.interviewers) {
+      for (const pi of currentPanel.interviewers) {
         const conflict = await tx.bookingHost.findFirst({
           where: {
             userId: pi.userId,
             status: 'SCHEDULED',
-            startTime: { lt: endUtc },
-            endTime: { gt: startUtc },
+            startTime: { lt: endUtc }, endTime: { gt: startUtc },
           },
         });
 
@@ -451,8 +409,8 @@ export const bookingsService = {
       }
 
       // Validate the slot exists in the panel's generated availability
-      const date = formatInTimeZone(startUtc, 'UTC', 'yyyy-MM-dd');
-      const availableSlots = await panelSlotsService.getSlots(panelSlug, date);
+      const date = formatInTimeZone(startUtc, data.timezone, 'yyyy-MM-dd');
+      const availableSlots = await panelSlotsService.getSlots(panelSlug, date, data.timezone);
       const isValid = availableSlots.some(
         (s) => new Date(s).getTime() === startUtc.getTime()
       );
@@ -462,19 +420,20 @@ export const bookingsService = {
 
       const booking = await tx.booking.create({
         data: {
-          panelId: panel.id,
+          panelId: currentPanel.id,
           // eventTypeId and userId explicitly NULL — panel booking
           inviteeName: data.inviteeName,
           inviteeEmail: data.inviteeEmail,
           startTime: startUtc,
           endTime: endUtc,
+          durationMinutes: currentPanel.duration,
           status: 'SCHEDULED',
         },
       });
 
       // Create one BookingHost row per panel interviewer
       await tx.bookingHost.createMany({
-        data: panel.interviewers.map((pi) => ({
+        data: currentPanel.interviewers.map((pi) => ({
           bookingId: booking.id,
           userId: pi.userId,
           startTime: startUtc,
@@ -482,11 +441,13 @@ export const bookingsService = {
           status: 'SCHEDULED' as const,
         })),
       });
-
       return booking;
     });
 
-    setImmediate(() => postBookingAutomation('created', result.id));
+    void indexBooking(result.id).catch((error) => {
+      console.error('[ai] booking index failed after create', { bookingId: result.id, error: error instanceof Error ? error.message : String(error) });
+    });
+
     return result;
   },
 
@@ -533,6 +494,7 @@ export const bookingsService = {
       where: { uid },
       include: {
         eventType: true,
+        hosts: true,
         panel: { include: { interviewers: true } },
       },
     });
@@ -541,26 +503,23 @@ export const bookingsService = {
       throw new NotFoundError('Booking not found');
     }
 
-    if (oldBooking.status === 'CANCELLED') {
-      throw new ConflictError('This booking is already cancelled.');
-    }
+    if (oldBooking.status !== 'SCHEDULED' || oldBooking.endTime <= new Date()) throw new ConflictError('This booking can no longer be rescheduled.');
 
     const isPanel = oldBooking.panelId !== null;
-    const duration = isPanel ? oldBooking.panel!.duration : oldBooking.eventType!.duration;
+    const duration = oldBooking.durationMinutes;
 
     const startUtc = new Date(newStartTime);
     const endUtc = addMinutes(startUtc, duration);
 
     const beforeEventBufferMinutes = Math.max(0, options?.beforeEventBufferMinutes ?? 0);
     const afterEventBufferMinutes = Math.max(0, options?.afterEventBufferMinutes ?? 0);
-    const totalBufferWindowMinutes = beforeEventBufferMinutes + afterEventBufferMinutes;
-    const bufferedWindowStartUtc = subMinutes(startUtc, totalBufferWindowMinutes);
-    const bufferedWindowEndUtc = addMinutes(endUtc, totalBufferWindowMinutes);
+    const bufferedWindowStartUtc = subMinutes(startUtc, beforeEventBufferMinutes);
+    const bufferedWindowEndUtc = addMinutes(endUtc, afterEventBufferMinutes);
 
     const result = await prisma.$transaction(async (tx) => {
       if (isPanel) {
         // Lock all panel interviewers
-        const interviewerIds = oldBooking.panel!.interviewers.map((pi) => pi.userId).sort();
+        const interviewerIds = oldBooking.hosts.map((host) => host.userId).sort();
         for (const uid2 of interviewerIds) {
           await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${uid2} FOR UPDATE`;
         }
@@ -581,7 +540,7 @@ export const bookingsService = {
 
       if (isPanel) {
         // Re-validate all panel interviewers for the new slot
-        for (const pi of oldBooking.panel!.interviewers) {
+        for (const pi of oldBooking.hosts) {
           const conflict = await tx.bookingHost.findFirst({
             where: {
               userId: pi.userId,
@@ -602,12 +561,13 @@ export const bookingsService = {
             inviteeEmail: oldBooking.inviteeEmail,
             startTime: startUtc,
             endTime: endUtc,
+            durationMinutes: duration,
             status: 'SCHEDULED',
           },
         });
 
         await tx.bookingHost.createMany({
-          data: oldBooking.panel!.interviewers.map((pi) => ({
+          data: oldBooking.hosts.map((pi) => ({
             bookingId: newBooking.id,
             userId: pi.userId,
             startTime: startUtc,
@@ -615,7 +575,6 @@ export const bookingsService = {
             status: 'SCHEDULED' as const,
           })),
         });
-
         return newBooking;
       } else {
         // Individual booking reschedule
@@ -640,6 +599,7 @@ export const bookingsService = {
             inviteeEmail: oldBooking.inviteeEmail,
             startTime: startUtc,
             endTime: endUtc,
+            durationMinutes: duration,
             status: 'SCHEDULED',
           },
         });
@@ -653,12 +613,14 @@ export const bookingsService = {
             status: 'SCHEDULED',
           },
         });
-
         return newBooking;
       }
     });
 
-    setImmediate(() => postBookingAutomation('rescheduled', result.id, oldBooking));
+    void Promise.all([oldBooking.id, result.id].map((id) => indexBooking(id))).catch((error) => {
+      console.error('[ai] booking index failed after reschedule', { oldBookingId: oldBooking.id, newBookingId: result.id, error: error instanceof Error ? error.message : String(error) });
+    });
+
     return result;
   },
 };

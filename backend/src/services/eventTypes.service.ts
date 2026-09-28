@@ -6,6 +6,7 @@
  */
 import { prisma } from '../config/prisma';
 import { NotFoundError, BadRequestError } from '../utils/errors';
+import { indexEventType } from '../ai/indexers/indexer.service';
 
 export const eventTypesService = {
   /**
@@ -44,6 +45,7 @@ export const eventTypesService = {
       isActive?: boolean;
     }
   ) {
+    if (!Number.isInteger(data.duration) || data.duration < 1) throw new BadRequestError('Duration must be at least 1 minute');
     // Check slug uniqueness before INSERT to give a clean 400 error.
     // The DB has a UNIQUE(userId, slug) constraint as a fallback.
     const existing = await prisma.eventType.findUnique({
@@ -53,7 +55,7 @@ export const eventTypesService = {
       throw new BadRequestError('Slug already exists');
     }
 
-    return prisma.eventType.create({
+    const created = await prisma.eventType.create({
       data: {
         userId,
         title: data.title,
@@ -63,6 +65,8 @@ export const eventTypesService = {
         isActive: data.isActive ?? true,
       },
     });
+    void indexEventType(created.id).catch((error) => console.error('[ai] event type index failed after create', { eventTypeId: created.id, error: error instanceof Error ? error.message : String(error) }));
+    return created;
   },
 
   /**
@@ -86,6 +90,7 @@ export const eventTypesService = {
       throw new NotFoundError('Event type not found');
     }
 
+    if (data.duration !== undefined && (!Number.isInteger(data.duration) || data.duration < 1)) throw new BadRequestError('Duration must be at least 1 minute');
     // If slug changed, verify the new slug isn't taken by another event type
     if (data.slug && data.slug !== eventType.slug) {
       const existing = await prisma.eventType.findUnique({
@@ -96,7 +101,7 @@ export const eventTypesService = {
       }
     }
 
-    return prisma.eventType.update({
+    const updated = await prisma.eventType.update({
       where: { id },
       data: {
         title: data.title,
@@ -106,6 +111,8 @@ export const eventTypesService = {
         isActive: data.isActive,
       },
     });
+    void indexEventType(updated.id).catch((error) => console.error('[ai] event type index failed after update', { eventTypeId: updated.id, error: error instanceof Error ? error.message : String(error) }));
+    return updated;
   },
 
   /**
@@ -123,9 +130,8 @@ export const eventTypesService = {
       throw new NotFoundError('Event type not found');
     }
 
-    // Delete associated bookings first, then the event type
-    await prisma.booking.deleteMany({ where: { eventTypeId: id } });
-    await prisma.eventType.delete({ where: { id } });
+    await prisma.eventType.update({ where: { id }, data: { isActive: false } });
+    void indexEventType(id).catch((error) => console.error('[ai] event type index failed after deactivate', { eventTypeId: id, error: error instanceof Error ? error.message : String(error) }));
 
     return { success: true };
   },

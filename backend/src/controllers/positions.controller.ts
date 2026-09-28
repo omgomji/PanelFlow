@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { positionsService } from '../services/positions.service';
 
 export const positionsController = {
+  // Product policy: any current ADMIN may manage positions and their panels.
   async list(_req: Request, res: Response) {
     const positions = await positionsService.findAll();
     res.json(positions);

@@ -20,7 +20,6 @@ import {
   subMonths,
 } from 'date-fns';
 import { Button } from '@/components/ui/Button';
-import { Switch } from '@/components/ui/Switch';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { AlertDialog } from '@/components/ui/AlertDialog';
 
@@ -39,8 +38,6 @@ export default function MeetingsPage() {
   const showAlert = (title: string, message: string) => setAlertInfo({ isOpen: true, title, message });
   const closeAlert = () => setAlertInfo(prev => ({ ...prev, isOpen: false }));
   const [activeTab, setActiveTab] = useState('Upcoming');
-  const [showBufferTime, setShowBufferTime] = useState(true);
-  const [sourceFilter, setSourceFilter] = useState<'My PanelFlow' | 'Team booking page'>('My PanelFlow');
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
   const [baseMonth, setBaseMonth] = useState(startOfMonth(new Date()));
   const [selectedPreset, setSelectedPreset] = useState<'Today' | 'This week' | 'This month' | 'All time'>('Today');
@@ -271,20 +268,6 @@ export default function MeetingsPage() {
         <h1 className="font-display text-[28px] font-bold text-ink">Meetings ({totalCount})</h1>
       </div>
 
-      <div className="mb-6 flex flex-wrap items-center gap-6">
-        <Button
-          variant={sourceFilter === 'My PanelFlow' ? 'primary' : 'secondary'}
-          size="sm"
-          onClick={() => setSourceFilter('My PanelFlow')}
-        >
-          My PanelFlow
-        </Button>
-
-        <div className="flex items-center gap-3">
-          <span className="font-display text-sm font-bold text-ink">Show buffer time</span>
-          <Switch checked={showBufferTime} onCheckedChange={setShowBufferTime} />
-        </div>
-      </div>
 
       <div className="relative border-2 border-ink bg-paper shadow-sm" ref={dateRangeRef}>
         <div className="flex flex-col gap-3 border-b-2 border-ink px-4 py-3 sm:flex-row sm:items-center sm:justify-between">

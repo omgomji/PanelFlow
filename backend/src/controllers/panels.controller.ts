@@ -3,6 +3,7 @@ import { panelsService } from '../services/panels.service';
 import { BadRequestError } from '../utils/errors';
 
 export const panelsController = {
+  // Product policy: any current ADMIN may manage panels and membership.
   async getById(req: Request, res: Response) {
     const id = parseInt(String(req.params.id), 10);
     const panel = await panelsService.findById(id);

@@ -66,11 +66,11 @@ export default function Sidebar({
   const navLinks = [
     { name: 'Scheduling', href: '/', icon: 'calendar_today' },
     { name: 'Meetings', href: '/meetings', icon: 'group' },
+    { name: 'Ask PanelFlow', href: '/ai', icon: 'auto_awesome' },
     { name: 'Availability', href: '/availability', icon: 'schedule' },
     { name: 'Projects & Roles', href: '/positions', icon: 'work' },
     { name: 'Feedback', href: '/feedback', icon: 'rate_review' },
     { name: 'Contacts', href: '/contacts', icon: 'person_book' },
-    { name: 'Webhooks', href: '/settings/webhooks', icon: 'webhook' },
     { name: 'Settings', href: '/settings', icon: 'settings' },
   ];
 
@@ -87,19 +87,6 @@ export default function Sidebar({
     window.dispatchEvent(new CustomEvent('open-create-event'));
   };
 
-  const openSingleUseLinks = () => {
-    setCreateMenuOpen(false);
-    onCloseMobile();
-    router.push('/');
-    window.dispatchEvent(new CustomEvent('open-single-use-links'));
-  };
-
-  const openMeetingPolls = () => {
-    setCreateMenuOpen(false);
-    onCloseMobile();
-    router.push('/');
-    window.dispatchEvent(new CustomEvent('open-meeting-polls'));
-  };
 
   const sidebarCollapsed = isDesktopViewport ? collapsed : false;
 
@@ -116,7 +103,7 @@ export default function Sidebar({
     >
       <div className={sidebarCollapsed ? 'p-4 pb-2' : 'p-4 sm:p-6 sm:pb-2 pb-2'}>
         {/* Logo */}
-        <div className="flex items-center gap-2 mb-6 cursor-pointer select-none">
+        <div className="flex items-center gap-2 mb-6 select-none">
           <div className="w-8 h-8 flex items-center justify-center text-stamp shrink-0">
             <span className="material-symbols-outlined text-xl font-bold transform -rotate-6">gavel</span>
           </div>
@@ -167,8 +154,6 @@ export default function Sidebar({
             <div className={`absolute top-[calc(100%+8px)] z-50 ${sidebarCollapsed ? 'left-0' : 'left-0'}`}>
               <CreateMenuPopover
                 onCreateEventType={openEventTypeCreate}
-                onCreateSingleUseLink={openSingleUseLinks}
-                onCreateMeetingPoll={openMeetingPolls}
               />
             </div>
           ) : null}

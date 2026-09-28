@@ -10,11 +10,8 @@ This project initially began as a standard Calendly clone (Phase 1) focused on 1
 |---|---|---|
 | **Scheduling** | 1-on-1 Events | Traditional scheduling with customizable duration, buffer times, and recurring availability rules. |
 | | Panel Interviews | Admin-configured multi-interviewer panels linked to Job Positions. Candidates book time with a group. |
-| | Single-Use Links | One-time booking links that expire after a single use. |
-| | Meeting Polls | Propose multiple times to attendees and let them vote on the best slot. |
-| **Automation** | Email Notifications | Automated confirmation, cancellation, and reminder emails via Resend. |
-| | Webhooks | Developer hooks (e.g. `booking.created`, `feedback.submitted`) with HMAC-SHA256 signature verification. |
-| | Reminders (Cron) | Scheduled jobs checking for upcoming meetings to dispatch 24h/1h reminders. |
+| | Single-Use Links | Planned; not currently available in the UI. |
+| | Meeting Polls | Planned; not currently available in the UI. |
 | **Admin & Feedback**| Feedback System | Interviewers submit structured (STRONG_NO to STRONG_YES) feedback + notes after a booking. |
 | | Reveal Gating | To prevent bias, interviewers cannot see co-panelists' feedback until they submit their own. |
 | | Workload Widget | Admins can view a breakdown of how many interviews each interviewer has conducted in the last 30 days. |
@@ -25,8 +22,6 @@ This project initially began as a standard Calendly clone (Phase 1) focused on 1
 - **Frontend**: Next.js (App Router), React, Tailwind CSS, Axios
 - **Backend**: Node.js, Express, Prisma ORM
 - **Database**: PostgreSQL
-- **Email**: Resend API
-- **Cron**: node-cron (for scheduled reminder checks)
 
 ## Architecture
 
@@ -52,13 +47,17 @@ erDiagram
     }
 ```
 
+### AI / RAG
+
+PanelFlow now includes an authorization-aware AI assistant built as an extension of the existing backend. It uses LangGraph for explicit orchestration, LangChain for chunking/embeddings/vector retrieval, and PostgreSQL + pgvector for the vector index. The source of truth remains Prisma/PostgreSQL. See `backend/src/ai/README.md` for setup, index rebuild, authorization, and maintenance details.
+
 ## Known Limitations
 
-- **Authentication**: Uses stateless JWTs in `httpOnly` cookies. There is no refresh token mechanism; tokens must expire and force a re-login.
-- **Email Delivery**: Powered by Resend. Unless a custom domain is verified in the Resend dashboard, emails can only be sent to the registered owner's email address.
-- **SMS**: Not implemented in this version; only email notifications are supported.
-- **Timezones**: Currently standardized around a primary timezone (often IST in demo data), though the data model stores everything in UTC. Real-world scaling requires robust localized timezone formatting on the frontend.
-- **Cron Execution**: The cron job runs within the same Node process. In a multi-instance deployment, this would cause duplicate reminders unless moved to a distributed task runner (e.g., BullMQ) or an external cron service calling an endpoint.
+- **Authentication**: Access JWTs are checked against the current user token version. Refresh tokens are database-backed, rotated on use, and revoked at logout.
+- **Rate limiting**: The included limiter is process-local; multi-instance deployments require a shared rate-limit store.
+- **Deployment sequencing**: Apply Prisma migrations before deploying the application version that requires them. The current migrations are additive; rollback application code only after confirming the schema remains compatible. Do not roll back database migrations automatically in production.
+- **SMS**: Not implemented in this version.
+- **Timezones**: Availability schedules are stored in their declared IANA timezone. Bookings are UTC timestamps and are displayed in the relevant viewer timezone.
 
 ## Try It
 
@@ -67,7 +66,7 @@ You can run the full demo locally. The backend comes with a pre-configured seed 
 1. Setup the database and run the seed:
    ```bash
    cd backend
-   npx prisma db push
+   npx prisma migrate deploy
    npx prisma db seed
    ```
 2. Start the backend: `npm run dev`
@@ -81,3 +80,10 @@ On the login page, you can simply click the **"Autofill Admin Credentials"** but
 - Interviewer: `bob@example.com` / `password123`
 
 *(Screenshots to be added here manually post-deployment)*
+
+
+## PanelFlow AI provider setup
+
+PanelFlow AI uses Groq with `qwen/qwen3.8-27b` as its primary model and Gemini Flash as a controlled fallback for quota/rate-limit/transient Groq failures. Copy `backend/.env.example` to your local environment and set `GROQ_API_KEY`; adding `GEMINI_API_KEY` enables fallback operation.
+
+The AI endpoint is deliberately scoped to PanelFlow tasks rather than functioning as an unrestricted chatbot. It applies prompt-injection/out-of-scope screening, authorization-aware retrieval, untrusted-context handling, bounded output, and explicit application tools for scheduling operations.

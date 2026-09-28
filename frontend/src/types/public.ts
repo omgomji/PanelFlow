@@ -35,10 +35,13 @@ export interface RescheduleBookingDetails {
   startTime: string;
   endTime: string;
   status: string;
+  durationMinutes?: number;
 }
 
 export interface RescheduleDetailsResponse {
+  kind: 'individual' | 'panel';
   booking: RescheduleBookingDetails;
-  eventType: PublicEventTypeDetails;
-  user: Required<Pick<PublicUser, 'name' | 'username' | 'timezone'>>;
+  eventType?: PublicEventTypeDetails;
+  user?: Required<Pick<PublicUser, 'name' | 'username' | 'timezone'>>;
+  panel?: { title: string; slug: string; duration: number; position?: { title: string }; interviewers?: { name: string }[] };
 }

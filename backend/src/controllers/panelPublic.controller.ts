@@ -13,6 +13,17 @@ import { panelSlotsService } from '../services/panelSlots.service';
 import { panelsService } from '../services/panels.service';
 import { bookingsService } from '../services/bookings.service';
 import { BadRequestError } from '../utils/errors';
+import { isValidTimezone, isValidYyyyMmDd } from '../utils/availability.validation';
+
+function bookingInput(body: Record<string, unknown>) {
+  const inviteeName = String(body.inviteeName ?? '').trim();
+  const inviteeEmail = String(body.inviteeEmail ?? '').trim().toLowerCase();
+  const startTime = String(body.startTime ?? '');
+  if (!inviteeName || inviteeName.length > 200) throw new BadRequestError('Invalid inviteeName');
+  if (!inviteeEmail || inviteeEmail.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteeEmail)) throw new BadRequestError('Invalid inviteeEmail');
+  if (Number.isNaN(new Date(startTime).getTime())) throw new BadRequestError('Invalid startTime');
+  return { inviteeName, inviteeEmail, startTime };
+}
 
 export const panelPublicController = {
   /**
@@ -46,12 +57,13 @@ export const panelPublicController = {
   async getSlots(req: Request, res: Response) {
     const panelSlug = req.params.panelSlug as string;
     const date = req.query.date as string | undefined;
+    const timezone = req.query.timezone as string | undefined;
 
-    if (!date) {
-      throw new BadRequestError('date is required (YYYY-MM-DD)');
+    if (!date || !isValidYyyyMmDd(date) || !timezone || !isValidTimezone(timezone)) {
+      throw new BadRequestError('date (YYYY-MM-DD) and timezone are required');
     }
 
-    const slots = await panelSlotsService.getSlots(panelSlug, date);
+    const slots = await panelSlotsService.getSlots(panelSlug, date, timezone);
 
     res.set('Cache-Control', 'no-store');
     res.json(slots.map((s) => ({ time: s })));
@@ -63,25 +75,16 @@ export const panelPublicController = {
    */
   async createBooking(req: Request, res: Response) {
     const panelSlug = req.params.panelSlug as string;
-    const { inviteeName, inviteeEmail, startTime } = req.body as {
-      inviteeName?: string;
-      inviteeEmail?: string;
-      startTime?: string;
-    };
-
-    if (!inviteeName || !inviteeEmail || !startTime) {
-      throw new BadRequestError('inviteeName, inviteeEmail, and startTime are required');
-    }
-
-    const startDate = new Date(String(startTime));
-    if (Number.isNaN(startDate.getTime())) {
-      throw new BadRequestError('Invalid startTime value');
-    }
+    const { inviteeName, inviteeEmail, startTime } = bookingInput(req.body);
+    const timezone = String(req.body.timezone ?? '');
+    if (!isValidTimezone(timezone)) throw new BadRequestError('Invalid timezone value');
+    const startDate = new Date(startTime);
 
     const booking = await bookingsService.createPanelBooking(panelSlug, {
       inviteeName,
       inviteeEmail,
       startTime: startDate.toISOString(),
+      timezone,
     });
 
     // Fetch panel with interviewers for confirmation response

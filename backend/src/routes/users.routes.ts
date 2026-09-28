@@ -7,6 +7,7 @@
 import { Router, Request, Response } from 'express';
 import { requireRole, requireAuth } from '../middleware/auth';
 import { prisma } from '../config/prisma';
+import { isValidTimezone } from '../utils/availability.validation';
 
 const router = Router();
 
@@ -14,6 +15,9 @@ router.patch('/me', requireAuth, async (req: Request, res: Response) => {
   const { timezone } = req.body;
   if (!timezone) {
     return res.status(400).json({ error: 'timezone is required' });
+  }
+  if (!isValidTimezone(String(timezone))) {
+    return res.status(400).json({ error: 'Invalid timezone value' });
   }
 
   const user = await prisma.user.update({

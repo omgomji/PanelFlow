@@ -34,8 +34,10 @@ export interface BookingPayload {
 export interface CreatedBooking {
   id: number;
   uid: string;
-  eventTypeId: number;
-  userId: number;
+  eventTypeId: number | null;
+  userId: number | null;
+  panelId?: number | null;
+  durationMinutes: number;
   inviteeName: string;
   inviteeEmail: string;
   startTime: string;

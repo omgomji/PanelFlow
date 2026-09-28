@@ -183,7 +183,12 @@ export default function FeedbackPage() {
                                     onClick={() => setRecommendation(opt.val as Recommendation)}
                                     className={`px-4 py-2 rounded-sm text-[14px] font-display font-semibold tracking-wide font-bold border transition-colors ${
                                       recommendation === opt.val
-                                        ? `bg-${opt.color}-100 border-${opt.color}-200 text-${opt.color}-700`
+                                        ? ({
+                                            red: 'bg-oxblood/20 border-oxblood text-oxblood',
+                                            orange: 'bg-clay/20 border-clay text-ink',
+                                            emerald: 'bg-sage/20 border-sage text-sage',
+                                            green: 'bg-sage/20 border-sage text-sage',
+                                          }[opt.color])
                                         : 'bg-paper border-ink border-2 text-ink/70 hover:bg-clay/5'
                                     }`}
                                   >

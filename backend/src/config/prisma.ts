@@ -5,6 +5,7 @@
  * instead of creating separate clients (which would open multiple
  * connection pools).
  */
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 
 export const prisma = new PrismaClient();

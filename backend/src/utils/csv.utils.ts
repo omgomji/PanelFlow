@@ -9,6 +9,7 @@ interface BookingRow {
   inviteeName: string;
   inviteeEmail: string;
   eventType?: { title?: string };
+  panel?: { title?: string };
   status: string;
   startTime: Date | string;
   endTime: Date | string;
@@ -32,7 +33,7 @@ export function generateBookingsCsv(bookings: BookingRow[]): string {
       booking.id,
       booking.inviteeName,
       booking.inviteeEmail,
-      booking.eventType?.title || '',
+      booking.panel?.title ?? booking.eventType?.title ?? '',
       booking.status,
       booking.startTime instanceof Date ? booking.startTime.toISOString() : booking.startTime,
       booking.endTime instanceof Date ? booking.endTime.toISOString() : booking.endTime,

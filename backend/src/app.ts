@@ -29,21 +29,30 @@ import authRouter from './routes/auth.routes';
 import positionsRouter from './routes/positions.routes';
 import panelsRouter from './routes/panels.routes';
 import usersRouter from './routes/users.routes';
-import cronRouter from './routes/cron.routes';
-import webhookRouter from './routes/webhook.routes';
 import adminRouter from './routes/admin.routes';
+import aiRouter from './routes/ai.routes';
 import { requireAuth } from './middleware/auth';
 import { errorHandler } from './middleware/errorHandler';
+import { csrfOriginProtection, rateLimit } from './middleware/security';
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 5000;
 
+const isAllowedDevelopmentOrigin = (origin: string) =>
+  /^http:\/\/(localhost|127\.0\.0\.1|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(origin);
+
 // ── Global Middleware ────────────────────────────────────────
 // CORS: exact origin required when credentials:true — '*' is rejected by browsers.
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    if (!origin || origin === (process.env.FRONTEND_URL || 'http://localhost:3000') || (process.env.NODE_ENV !== 'production' && isAllowedDevelopmentOrigin(origin))) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error('Origin is not allowed by CORS'));
+  },
   credentials: true,
 }));
 
@@ -51,6 +60,7 @@ app.use(cors({
 // Without it, req.cookies is undefined even when the browser sends the cookie.
 app.use(cookieParser());
 app.use(express.json());
+app.use(csrfOriginProtection);
 
 // ── Health Check ─────────────────────────────────────────────
 app.get('/health', (_req, res) => {
@@ -58,7 +68,7 @@ app.get('/health', (_req, res) => {
 });
 
 // ── Auth Routes (public) ──────────────────────────────────────
-app.use('/api/auth', authRouter);
+app.use('/api/auth', rateLimit(20, 15 * 60 * 1000), authRouter);
 
 // ── Admin Routes ──────────────────────────────────────────────
 // Protected by requireAuth — decodes JWT, attaches req.user = { id, role }.
@@ -69,13 +79,12 @@ app.use('/api/contacts', requireAuth, contactsRouter);
 app.use('/api/positions', requireAuth, positionsRouter);
 app.use('/api/panels', requireAuth, panelsRouter);
 app.use('/api/users', requireAuth, usersRouter);
-app.use('/api/webhooks', requireAuth, webhookRouter);
 app.use('/api/admin', requireAuth, adminRouter);
-app.use('/api/cron', cronRouter);
+app.use('/api/ai', requireAuth, aiRouter);
 
 // ── Public Routes ────────────────────────────────────────────
 // No auth required — accessed by invitees via booking links.
-app.use('/api/public', publicRouter);
+app.use('/api/public', rateLimit(120, 15 * 60 * 1000), publicRouter);
 
 // ── Global Error Handler ─────────────────────────────────────
 // Must be registered LAST. Express 5 auto-forwards async errors here.

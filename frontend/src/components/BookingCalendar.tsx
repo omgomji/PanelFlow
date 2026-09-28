@@ -17,20 +17,11 @@ import { formatInTimeZone } from 'date-fns-tz';
 import type { PublicSlotItem } from '@/types/public';
 
 interface BookingCalendarProps {
-  /** Called when a new date is selected — should return available slot ISO strings */
   fetchSlots: (date: string) => Promise<PublicSlotItem[]>;
-  /** Called when the user clicks Next on a slot */
   onSlotSelect: (slotIso: string, hostDate: string) => void;
-  /** Timezone to display slot times in */
   timezone: string;
 }
 
-/**
- * Shared calendar + time-slot picker component.
- * Used by both the individual booking page and the panel booking page.
- * Parameterized by a slots-fetching function and a submit handler so
- * the two flows share one implementation.
- */
 export default function BookingCalendar({
   fetchSlots,
   onSlotSelect,
@@ -65,7 +56,6 @@ export default function BookingCalendar({
     loadSlots(date);
   };
 
-  // Auto-refresh slots on window focus and every 15s
   useEffect(() => {
     if (!selectedDate) return;
     const refresh = () => void loadSlots(selectedDate);
@@ -94,52 +84,69 @@ export default function BookingCalendar({
 
   return (
     <div>
-      <h2 className="text-[18px] font-bold text-slate-900 mb-4">Select a Date &amp; Time</h2>
+      <div className="mb-6 border-b-2 border-ink pb-4">
+        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-stamp">
+          Availability
+        </p>
+        <h2 className="mt-1 font-display text-xl font-bold tracking-tight text-ink">
+          Select a date and time
+        </h2>
+      </div>
 
-      {/* Month Navigation */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 flex items-center justify-between gap-4">
         <button
+          type="button"
           onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
           disabled={isBefore(startOfMonth(currentMonth), startOfMonth(new Date()))}
-          className="inline-flex h-11 w-11 items-center justify-center rounded transition-colors hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent"
+          className="inline-flex h-10 w-10 items-center justify-center border border-clay/40 text-ink/70 transition-colors hover:bg-clay/10 hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+          aria-label="Previous month"
         >
-          <span className="material-symbols-outlined text-[20px] text-slate-600">chevron_left</span>
+          <span className="material-symbols-outlined text-[20px]">chevron_left</span>
         </button>
-        <span className="text-[16px] font-bold text-slate-900">{format(currentMonth, 'MMMM yyyy')}</span>
+        <span className="font-display text-base font-bold uppercase tracking-wide text-ink">
+          {format(currentMonth, 'MMMM yyyy')}
+        </span>
         <button
+          type="button"
           onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-          className="inline-flex h-11 w-11 items-center justify-center rounded transition-colors hover:bg-slate-100"
+          className="inline-flex h-10 w-10 items-center justify-center border border-clay/40 text-ink/70 transition-colors hover:bg-clay/10 hover:text-ink"
+          aria-label="Next month"
         >
-          <span className="material-symbols-outlined text-[20px] text-slate-600">chevron_right</span>
+          <span className="material-symbols-outlined text-[20px]">chevron_right</span>
         </button>
       </div>
 
-      <div className="flex flex-col gap-4 lg:flex-row">
-        {/* Calendar Grid */}
-        <div className="flex-1">
-          <div className="mb-2 grid grid-cols-7 gap-1.5 sm:gap-2">
-            {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((d) => (
-              <div key={d} className="text-center text-[10px] font-bold text-slate-500 py-2 sm:text-[12px]">
-                {d}
+      <div className="flex flex-col gap-8 lg:flex-row">
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 grid grid-cols-7 gap-1">
+            {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((day) => (
+              <div
+                key={day}
+                className="py-2 text-center font-mono text-[10px] font-semibold tracking-wider text-ink/45 sm:text-[11px]"
+              >
+                {day}
               </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
-            {paddingDays.map((_, i) => <div key={`pad-${i}`} />)}
-            {daysInMonth.map((day, i) => {
+          <div className="grid grid-cols-7 gap-1">
+            {paddingDays.map((_, index) => <div key={`pad-${index}`} />)}
+            {daysInMonth.map((day, index) => {
               const past = isBefore(day, startOfDay(new Date()));
               const isSelected = selectedDate && isSameDay(day, selectedDate);
 
               return (
                 <button
-                  key={i}
+                  key={index}
+                  type="button"
                   disabled={past}
                   onClick={() => handleDateClick(day)}
-                  className={`aspect-square rounded-md text-[13px] font-medium transition-colors
- ${past ? 'text-slate-300 cursor-not-allowed' : ''}
- ${isSelected ? 'bg-primary text-white hover:bg-blue-700' : 'text-slate-600 hover:bg-slate-100'}
- ${isToday(day) && !isSelected ? 'bg-slate-100' : ''}`}
+                  className={`aspect-square min-h-10 border text-sm font-display font-semibold transition-colors
+                    ${past ? 'cursor-not-allowed border-transparent text-ink/20' : 'border-transparent text-ink hover:border-clay/40 hover:bg-clay/5'}
+                    ${isSelected ? 'border-ink bg-ink text-paper hover:bg-ink hover:text-paper' : ''}
+                    ${isToday(day) && !isSelected ? 'border-stamp/60 text-stamp' : ''}`}
+                  aria-label={format(day, 'EEEE, MMMM d, yyyy')}
+                  aria-pressed={Boolean(isSelected)}
                 >
                   {format(day, 'd')}
                 </button>
@@ -147,67 +154,83 @@ export default function BookingCalendar({
             })}
           </div>
 
-          {/* Timezone */}
-          <div className="mt-6 text-[12px] text-slate-600">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="material-symbols-outlined text-[16px]">public</span>
-              <strong>Time zone</strong>
-            </div>
-            <span className="text-primary font-bold">{timezone}</span>
+          <div className="mt-7 flex items-start gap-2 border-t border-clay/30 pt-4 text-xs text-ink/55">
+            <span className="material-symbols-outlined text-[16px]">public</span>
+            <span>
+              Times are shown in <strong className="font-mono text-[11px] text-ink/75">{timezone}</strong>.
+            </span>
           </div>
-          <p className="mt-1 text-[11px] text-slate-500">Times shown in host timezone.</p>
         </div>
 
-        {/* Time Slots */}
-        {selectedDate && (
-          <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-4 lg:w-56">
-            <div className="text-[14px] font-bold text-slate-900 mb-4">
-              {format(selectedDate, 'EEEE, MMMM d')}
+        <div className="w-full border-t-2 border-ink pt-6 lg:w-64 lg:border-l-2 lg:border-t-0 lg:pl-6 lg:pt-0">
+          {!selectedDate ? (
+            <div className="flex h-full min-h-40 items-center justify-center text-center">
+              <div>
+                <span className="material-symbols-outlined text-3xl text-ink/25">event</span>
+                <p className="mt-2 font-display text-sm font-bold uppercase tracking-wide text-ink/50">
+                  Pick a date
+                </p>
+                <p className="mt-1 text-xs text-ink/40">Available times will appear here.</p>
+              </div>
             </div>
+          ) : (
+            <>
+              <div className="mb-4">
+                <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-ink/45">
+                  Selected date
+                </p>
+                <h3 className="mt-1 font-display text-base font-bold text-ink">
+                  {format(selectedDate, 'EEEE, MMMM d')}
+                </h3>
+              </div>
 
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {slotsLoading ? (
-                <div className="text-center py-6">
-                  <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-primary mx-auto" />
-                </div>
-              ) : availableSlots.length === 0 ? (
-                <div className="text-center py-6 text-slate-500 text-[12px]">
-                  No time slots available
-                </div>
-              ) : (
-                availableSlots.map((slotIso) => {
-                  const slotDate = new Date(slotIso);
-                  const slotTime = formatInTimeZone(slotDate, timezone, 'h:mma');
-                  const isSelected = selectedSlot === slotIso;
-                  const slotHostDate = formatInTimeZone(slotDate, timezone, 'yyyy-MM-dd');
+              <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                {slotsLoading ? (
+                  <div className="flex flex-col items-center justify-center py-10">
+                    <div className="h-6 w-6 animate-spin border-2 border-clay/30 border-b-stamp" />
+                    <span className="mt-3 font-mono text-[10px] font-semibold uppercase tracking-wider text-ink/45">
+                      Checking
+                    </span>
+                  </div>
+                ) : availableSlots.length === 0 ? (
+                  <div className="border border-clay/40 bg-clay/5 px-4 py-6 text-center">
+                    <span className="material-symbols-outlined text-2xl text-ink/30">schedule</span>
+                    <p className="mt-2 font-display text-sm font-bold text-ink/60">No times available</p>
+                    <p className="mt-1 text-xs text-ink/45">Try another date.</p>
+                  </div>
+                ) : (
+                  availableSlots.map((slotIso) => {
+                    const slotTime = formatInTimeZone(new Date(slotIso), timezone, 'h:mma');
+                    const isSelected = selectedSlot === slotIso;
 
-                  return (
-                    <div key={slotIso} className="flex gap-2">
+                    return (
                       <button
-                        onClick={() => setSelectedSlot(slotIso)}
-                        className={`flex-1 py-2 px-3 rounded-lg text-[12px] font-bold transition-colors
- ${isSelected
- ? 'bg-slate-700 text-white'
- : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-300'
- }`}
+                        key={slotIso}
+                        type="button"
+                        onClick={() => {
+                          setSelectedSlot(slotIso);
+                          onSlotSelect(slotIso, format(selectedDate, 'yyyy-MM-dd'));
+                        }}
+                        className={`w-full border-2 px-4 py-3 text-left font-display text-sm font-bold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-stamp
+                          ${isSelected
+                            ? 'border-ink bg-ink text-paper'
+                            : 'border-ink bg-paper text-stamp hover:bg-clay/5'}
+                        `}
                       >
-                        {slotTime}
+                        <span className="flex items-center justify-between gap-3">
+                          <span>{slotTime}</span>
+                          <span className="font-mono text-[10px] uppercase tracking-wider opacity-60">
+                            Select
+                          </span>
+                        </span>
                       </button>
-                      {isSelected && (
-                        <button
-                          onClick={() => onSlotSelect(slotIso, slotHostDate)}
-                          className="min-h-11 rounded-lg bg-primary px-4 py-2 text-[12px] font-bold text-white transition-colors hover:bg-blue-700"
-                        >
-                          Next
-                        </button>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        )}
+                    );
+                  })
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

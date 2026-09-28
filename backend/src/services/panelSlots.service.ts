@@ -17,9 +17,9 @@
  * strings — the caller (or frontend) handles timezone display.
  */
 import { addMinutes } from 'date-fns';
-import { fromZonedTime, formatInTimeZone } from 'date-fns-tz';
+import { formatInTimeZone } from 'date-fns-tz';
 import { prisma } from '../config/prisma';
-import { getFreeIntervalsForUser } from './slots.service';
+import { differenceInCalendarDaysInTimezone, getCandidateDayBounds, getFreeIntervalsForUser } from './slots.service';
 import { NotFoundError } from '../utils/errors';
 
 /**
@@ -53,16 +53,23 @@ function intersectIntervals(
   return result;
 }
 
+function gcd(a: number, b: number): number { return b === 0 ? a : gcd(b, a % b); }
+function lcm(a: number, b: number): number { return Math.abs(a * b) / gcd(a, b); }
+export function commonPanelIncrement(increments: number[], fallback: number): number {
+  return increments.length ? increments.reduce((common, increment) => lcm(common, increment)) : fallback;
+}
+
 export const panelSlotsService = {
   /**
    * Returns available UTC slot strings for a panel on a given date.
    * Response shape matches /api/public/:username/:slug/slots (array of ISO strings)
    * so the frontend BookingCalendar component can be reused unchanged.
    */
-  async getSlots(panelSlug: string, date: string): Promise<string[]> {
+  async getSlots(panelSlug: string, date: string, candidateTimezone = 'UTC'): Promise<string[]> {
     const panel = await prisma.panel.findUnique({
       where: { slug: panelSlug },
       include: {
+        position: { select: { status: true } },
         interviewers: {
           include: {
             user: {
@@ -73,7 +80,7 @@ export const panelSlotsService = {
       },
     });
 
-    if (!panel || !panel.isActive) {
+    if (!panel || !panel.isActive || panel.position.status !== 'OPEN') {
       throw new NotFoundError('Panel not found');
     }
 
@@ -85,7 +92,7 @@ export const panelSlotsService = {
     // Apply most-restrictive values across all interviewers.
     let minimumNoticeMinutes = 0;
     let maximumDaysInFuture = Infinity;
-    let startTimeIncrementMinutes = 0;
+    const increments: number[] = [];
     let allowBackToBack = true;
 
     for (const pi of panel.interviewers) {
@@ -93,37 +100,38 @@ export const panelSlotsService = {
       if (!sched) continue;
       minimumNoticeMinutes = Math.max(minimumNoticeMinutes, sched.minimumNoticeMinutes);
       maximumDaysInFuture = Math.min(maximumDaysInFuture, sched.maximumDaysInFuture);
-      startTimeIncrementMinutes = Math.max(startTimeIncrementMinutes, sched.startTimeIncrementMinutes);
+      increments.push(sched.startTimeIncrementMinutes);
       allowBackToBack = allowBackToBack && sched.allowBackToBack;
     }
 
-    // Default increment if no schedule exists for any interviewer
-    if (startTimeIncrementMinutes === 0) startTimeIncrementMinutes = panel.duration;
+    // Shared panel grid is the least common multiple of all host increments.
+    // A generated start is therefore aligned with every host's grid.
+    const startTimeIncrementMinutes = commonPanelIncrement(increments, panel.duration);
     const effectiveMaxDays = isFinite(maximumDaysInFuture) ? maximumDaysInFuture : 60;
 
-    // ── Check maximumDaysInFuture ────────────────────────────
-    // Use the first interviewer's timezone, or UTC as fallback
-    const refTimezone =
-      panel.interviewers[0]?.user.availabilitySchedule?.timezone ?? 'UTC';
+    // Candidate date is always interpreted in the candidate's declared timezone.
     const nowUtc = new Date();
-    const todayHost = formatInTimeZone(nowUtc, refTimezone, 'yyyy-MM-dd');
-    const dayDiff =
-      (fromZonedTime(`${date}T00:00:00`, refTimezone).getTime() -
-        fromZonedTime(`${todayHost}T00:00:00`, refTimezone).getTime()) /
-      (24 * 60 * 60 * 1000);
+    const { start: candidateStart, end: candidateEnd } = getCandidateDayBounds(date, candidateTimezone);
+    const dayDiff = differenceInCalendarDaysInTimezone(nowUtc, candidateStart, candidateTimezone);
 
     if (dayDiff > effectiveMaxDays || dayDiff < 0) {
       return [];
     }
 
     // ── Compute free intervals for each interviewer ───────────
-    const allFreeIntervals = await Promise.all(
-      panel.interviewers.map((pi) =>
-        getFreeIntervalsForUser(pi.userId, date, {
-          allowBackToBack,
-        })
-      )
-    );
+    const allFreeIntervals = await Promise.all(panel.interviewers.map(async (pi) => {
+      const timezone = pi.user.availabilitySchedule?.timezone;
+      if (!timezone) return [];
+      const dates = [...new Set([
+        formatInTimeZone(candidateStart, timezone, 'yyyy-MM-dd'),
+        formatInTimeZone(addMinutes(candidateEnd, -1), timezone, 'yyyy-MM-dd'),
+      ])];
+      const intervals = (await Promise.all(dates.map((localDate) => getFreeIntervalsForUser(pi.userId, localDate)))).flat();
+      return intervals.map((interval) => ({
+        start: interval.start > candidateStart ? interval.start : candidateStart,
+        end: interval.end < candidateEnd ? interval.end : candidateEnd,
+      })).filter((interval) => interval.start < interval.end);
+    }));
 
     if (allFreeIntervals.some((intervals) => intervals.length === 0)) {
       return []; // Any interviewer with zero free time = no panel slots

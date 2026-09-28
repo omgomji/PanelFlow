@@ -64,20 +64,22 @@ export const authController = {
       throw new UnauthorizedError('No refresh token provided');
     }
 
-    const { accessToken } = await authService.refresh(refreshToken);
+    const { accessToken, refreshToken: nextRefreshToken } = await authService.refresh(refreshToken);
     const isProd = process.env.NODE_ENV === 'production';
 
     res.cookie('accessToken', accessToken, setCookieOptions(isProd, ACCESS_TOKEN_MAX_AGE));
+    res.cookie('refreshToken', nextRefreshToken, setCookieOptions(isProd, REFRESH_TOKEN_MAX_AGE));
     res.json({ message: 'Token refreshed successfully' });
   },
 
-  async logout(_req: Request, res: Response) {
+  async logout(req: Request, res: Response) {
     const isProd = process.env.NODE_ENV === 'production';
     const clearOptions = {
       httpOnly: true,
       secure: isProd,
       sameSite: isProd ? ('none' as const) : ('lax' as const),
     };
+    if (req.cookies?.refreshToken) await authService.revokeRefreshToken(req.cookies.refreshToken);
     res.clearCookie('accessToken', clearOptions);
     res.clearCookie('refreshToken', clearOptions);
     res.json({ message: 'Logged out successfully' });

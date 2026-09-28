@@ -6,6 +6,7 @@
  */
 import { prisma } from '../config/prisma';
 import { NotFoundError, BadRequestError } from '../utils/errors';
+import { safeReindexPositionAndBookings } from '../ai/indexers/sync';
 
 export const positionsService = {
   async findAll() {
@@ -51,7 +52,7 @@ export const positionsService = {
       throw new BadRequestError('Title is required');
     }
 
-    return prisma.position.create({
+    const created = await prisma.position.create({
       data: {
         title: data.title.trim(),
         description: data.description,
@@ -59,6 +60,8 @@ export const positionsService = {
         createdById,
       },
     });
+    void safeReindexPositionAndBookings(created.id, 'position created');
+    return created;
   },
 
   async update(
@@ -68,7 +71,7 @@ export const positionsService = {
     const position = await prisma.position.findUnique({ where: { id } });
     if (!position) throw new NotFoundError('Position not found');
 
-    return prisma.position.update({
+    const updated = await prisma.position.update({
       where: { id },
       data: {
         title: data.title?.trim(),
@@ -76,13 +79,16 @@ export const positionsService = {
         status: data.status,
       },
     });
+    void safeReindexPositionAndBookings(updated.id, 'position updated');
+    return updated;
   },
 
   async remove(id: number) {
     const position = await prisma.position.findUnique({ where: { id } });
     if (!position) throw new NotFoundError('Position not found');
 
-    await prisma.position.delete({ where: { id } });
+    await prisma.position.update({ where: { id }, data: { status: 'CLOSED' } });
+    void safeReindexPositionAndBookings(id, 'position closed');
     return { success: true };
   },
 

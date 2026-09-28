@@ -27,6 +27,27 @@ import { addMinutes, subMinutes } from 'date-fns';
 import { fromZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { prisma } from '../config/prisma';
 
+export function differenceInCalendarDaysInTimezone(from: Date, to: Date, timezone: string): number {
+  const label = (value: Date) => formatInTimeZone(value, timezone, 'yyyy-MM-dd');
+  return Math.round((Date.parse(`${label(to)}T00:00:00Z`) - Date.parse(`${label(from)}T00:00:00Z`)) / 86400000);
+}
+
+export function getCandidateDayBounds(date: string, timezone: string): { start: Date; end: Date } {
+  const candidateStart = fromZonedTime(`${date}T00:00:00`, timezone);
+  const nextDate = new Date(`${date}T00:00:00.000Z`);
+  nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+  const nextDateLabel = nextDate.toISOString().slice(0, 10);
+  return {
+    start: candidateStart,
+    end: fromZonedTime(`${nextDateLabel}T00:00:00`, timezone),
+  };
+}
+
+export function getEffectiveBufferPolicy(schedule: { allowBackToBack?: boolean; beforeEventBufferMinutes?: number; afterEventBufferMinutes?: number }) {
+  if (schedule.allowBackToBack !== false) return { beforeEventBufferMinutes: 0, afterEventBufferMinutes: 0 };
+  return { beforeEventBufferMinutes: Math.max(0, schedule.beforeEventBufferMinutes ?? 0), afterEventBufferMinutes: Math.max(0, schedule.afterEventBufferMinutes ?? 0) };
+}
+
 function toYyyyMmDd(value: Date | string): string {
   if (typeof value === 'string') {
     return value.slice(0, 10);
@@ -96,13 +117,10 @@ export async function getFreeIntervalsForUser(
 
   const scheduleTimezone = options?.scheduleTimezone ?? schedule.timezone;
   const allowBackToBack = options?.allowBackToBack ?? schedule.allowBackToBack ?? true;
-  const beforeEventBufferMinutes = allowBackToBack
-    ? 0
-    : Math.max(0, options?.beforeEventBufferMinutes ?? schedule.beforeEventBufferMinutes ?? 0);
-  const afterEventBufferMinutes = allowBackToBack
-    ? 0
-    : Math.max(0, options?.afterEventBufferMinutes ?? schedule.afterEventBufferMinutes ?? 0);
-  const totalBufferWindowMinutes = beforeEventBufferMinutes + afterEventBufferMinutes;
+  const { beforeEventBufferMinutes, afterEventBufferMinutes } = getEffectiveBufferPolicy({
+    allowBackToBack, beforeEventBufferMinutes: options?.beforeEventBufferMinutes ?? schedule.beforeEventBufferMinutes,
+    afterEventBufferMinutes: options?.afterEventBufferMinutes ?? schedule.afterEventBufferMinutes,
+  });
 
   // Determine day-of-week in the user's timezone
   const targetDateMidnight = fromZonedTime(`${date}T00:00:00`, scheduleTimezone);
@@ -130,8 +148,8 @@ export async function getFreeIntervalsForUser(
 
   const windowStartUtc = utcIntervals[0].startUtc;
   const windowEndUtc = utcIntervals[utcIntervals.length - 1].endUtc;
-  const conflictWindowStartUtc = subMinutes(windowStartUtc, totalBufferWindowMinutes);
-  const conflictWindowEndUtc = addMinutes(windowEndUtc, totalBufferWindowMinutes);
+  const conflictWindowStartUtc = subMinutes(windowStartUtc, beforeEventBufferMinutes);
+  const conflictWindowEndUtc = addMinutes(windowEndUtc, afterEventBufferMinutes);
 
   // Query busy time from BookingHost — catches both individual and panel commitments.
   const busyBlocks = await prisma.bookingHost.findMany({
@@ -191,19 +209,13 @@ export async function generateSlots(
   }
 ): Promise<string[]> {
   const allowBackToBack = options?.allowBackToBack ?? true;
-  const beforeEventBufferMinutes = allowBackToBack
-    ? 0
-    : Math.max(0, options?.beforeEventBufferMinutes ?? 0);
-  const afterEventBufferMinutes = allowBackToBack
-    ? 0
-    : Math.max(0, options?.afterEventBufferMinutes ?? 0);
+  const { beforeEventBufferMinutes, afterEventBufferMinutes } = getEffectiveBufferPolicy({ allowBackToBack, beforeEventBufferMinutes: options?.beforeEventBufferMinutes, afterEventBufferMinutes: options?.afterEventBufferMinutes });
   const startTimeIncrementMinutes = Math.max(
     5,
     options?.startTimeIncrementMinutes ?? eventDuration
   );
   const minimumNoticeMinutes = Math.max(0, options?.minimumNoticeMinutes ?? 0);
   const maximumDaysInFuture = Math.max(1, options?.maximumDaysInFuture ?? 60);
-  const totalBufferWindowMinutes = beforeEventBufferMinutes + afterEventBufferMinutes;
 
   // ── Step 1: Determine day-of-week in the host's timezone ───
   // date-fns-tz `formatInTimeZone` with pattern 'i' returns ISO day-of-week:
@@ -218,10 +230,7 @@ export async function generateSlots(
 
   const nowUtc = new Date();
   const todayHost = formatInTimeZone(nowUtc, scheduleTimezone, 'yyyy-MM-dd');
-  const dayDiff =
-    (fromZonedTime(`${date}T00:00:00`, scheduleTimezone).getTime() -
-      fromZonedTime(`${todayHost}T00:00:00`, scheduleTimezone).getTime()) /
-    (24 * 60 * 60 * 1000);
+  const dayDiff = differenceInCalendarDaysInTimezone(nowUtc, targetDateMidnight, scheduleTimezone);
   if (dayDiff > maximumDaysInFuture) {
     return [];
   }
@@ -251,8 +260,8 @@ export async function generateSlots(
 
   const windowStartUtc = utcIntervals[0].startUtc;
   const windowEndUtc = utcIntervals[utcIntervals.length - 1].endUtc;
-  const conflictWindowStartUtc = subMinutes(windowStartUtc, totalBufferWindowMinutes);
-  const conflictWindowEndUtc = addMinutes(windowEndUtc, totalBufferWindowMinutes);
+  const conflictWindowStartUtc = subMinutes(windowStartUtc, beforeEventBufferMinutes);
+  const conflictWindowEndUtc = addMinutes(windowEndUtc, afterEventBufferMinutes);
 
   // ── Step 4: Load existing busy time for overlap check ──────
   // Now queries BookingHost — catches both individual and panel commitments.

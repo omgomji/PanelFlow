@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/prisma';
-import { webhookService } from '../services/webhook.service';
 import { Recommendation } from '@prisma/client';
 import { ForbiddenError, NotFoundError } from '../utils/errors';
+import { indexBooking } from '../ai/indexers/indexer.service';
 
 export const feedbackController = {
   // GET /api/bookings/:id/feedback
@@ -81,8 +81,8 @@ export const feedbackController = {
         throw new ForbiddenError('Only hosts can submit feedback for this booking.');
       }
 
-      if (booking.status === 'CANCELLED') {
-        return res.status(400).json({ error: 'Cannot submit feedback for a CANCELLED booking.' });
+      if (booking.status !== 'SCHEDULED') {
+        return res.status(400).json({ error: 'Feedback can only be submitted for completed scheduled bookings.' });
       }
 
       const now = new Date();
@@ -98,20 +98,9 @@ export const feedbackController = {
         create: { bookingId, interviewerId: userId, recommendation, notes }
       });
 
-      // Fire webhook
-      let ownerId = booking.userId;
-      if (booking.panel) {
-        ownerId = booking.panel.position.createdById;
-      }
-      
-      if (ownerId) {
-        webhookService.dispatchWebhookEvent(ownerId, 'feedback.submitted', {
-          bookingId: booking.id,
-          interviewerId: userId,
-          recommendation,
-          notes
-        });
-      }
+      void indexBooking(bookingId).catch((error) => {
+        console.error('[ai] booking index failed after feedback update', { bookingId, error: error instanceof Error ? error.message : String(error) });
+      });
 
       return res.json(feedback);
     } catch (error) {

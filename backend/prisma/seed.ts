@@ -64,6 +64,7 @@ async function main() {
   await prisma.availabilitySchedule.deleteMany();
   await prisma.contact.deleteMany();
   await prisma.eventType.deleteMany();
+  await prisma.refreshSession.deleteMany();
   await prisma.user.deleteMany();
 
   console.log('🔑 Hashing passwords...');
@@ -202,6 +203,7 @@ async function main() {
       inviteeEmail: 'alex.j@example.com',
       startTime: tomorrow,
       endTime: new Date(tomorrow.getTime() + 15 * 60_000),
+      durationMinutes: 15,
       status: 'SCHEDULED',
     },
   });
@@ -225,6 +227,7 @@ async function main() {
       inviteeEmail: 'priya.sharma@example.com',
       startTime: dayAfter,
       endTime: new Date(dayAfter.getTime() + 30 * 60_000),
+      durationMinutes: 30,
       status: 'SCHEDULED',
     },
   });
@@ -248,6 +251,7 @@ async function main() {
       inviteeEmail: 'jordan.lee@example.com',
       startTime: yesterday,
       endTime: new Date(yesterday.getTime() + 45 * 60_000),
+      durationMinutes: 45,
       status: 'SCHEDULED',
     },
   });
@@ -271,6 +275,7 @@ async function main() {
       inviteeEmail: 'sam.taylor@example.com',
       startTime: twoDaysAgo,
       endTime: new Date(twoDaysAgo.getTime() + 15 * 60_000),
+      durationMinutes: 15,
       status: 'CANCELLED',
       cancellationReason: 'Candidate had a last minute emergency.',
     },
@@ -369,11 +374,12 @@ async function main() {
   const pastDisagreement = toUtcFromIst(now, -3, '14:00');
   await prisma.booking.create({
     data: {
-      panelId: pos1_panel2.id, // Backend & System Design
+      panel: { connect: { id: pos1_panel2.id } }, // Backend & System Design
       inviteeName: 'Alex Johnson',
       inviteeEmail: 'alex.j@example.com',
       startTime: pastDisagreement,
       endTime: new Date(pastDisagreement.getTime() + 60 * 60_000),
+      durationMinutes: 60,
       status: 'SCHEDULED',
       hosts: {
         create: [
@@ -394,11 +400,12 @@ async function main() {
   const pastPartial = toUtcFromIst(now, -1, '10:00');
   await prisma.booking.create({
     data: {
-      panelId: pos2_panel1.id, // Product Strategy
+      panel: { connect: { id: pos2_panel1.id } }, // Product Strategy
       inviteeName: 'Samantha Brooks',
       inviteeEmail: 'samantha.b@example.com',
       startTime: pastPartial,
       endTime: new Date(pastPartial.getTime() + 45 * 60_000),
+      durationMinutes: 45,
       status: 'SCHEDULED',
       hosts: {
         create: [
@@ -419,11 +426,12 @@ async function main() {
   const upcoming = toUtcFromIst(now, 2, '11:00');
   await prisma.booking.create({
     data: {
-      panelId: pos1_panel1.id, // Frontend Deep Dive
+      panel: { connect: { id: pos1_panel1.id } }, // Frontend Deep Dive
       inviteeName: 'Lucas Martinez',
       inviteeEmail: 'lucas.m@example.com',
       startTime: upcoming,
       endTime: new Date(upcoming.getTime() + 60 * 60_000),
+      durationMinutes: 60,
       status: 'SCHEDULED',
       hosts: {
         create: [
@@ -438,11 +446,12 @@ async function main() {
   const noShowTime = toUtcFromIst(now, -5, '09:00');
   await prisma.booking.create({
     data: {
-      panelId: pos3_panel1.id, // Leadership
+      panel: { connect: { id: pos3_panel1.id } }, // Leadership
       inviteeName: 'Marcus Johnson',
       inviteeEmail: 'marcus@example.com',
       startTime: noShowTime,
       endTime: new Date(noShowTime.getTime() + 60 * 60_000),
+      durationMinutes: 60,
       status: 'NO_SHOW',
       hosts: {
         create: [
@@ -457,11 +466,12 @@ async function main() {
   const cancelledTime = toUtcFromIst(now, 4, '13:00');
   await prisma.booking.create({
     data: {
-      panelId: pos2_panel1.id, // Product Strategy
+      panel: { connect: { id: pos2_panel1.id } }, // Product Strategy
       inviteeName: 'Lisa Wong',
       inviteeEmail: 'lisa.w@example.com',
       startTime: cancelledTime,
       endTime: new Date(cancelledTime.getTime() + 45 * 60_000),
+      durationMinutes: 45,
       status: 'CANCELLED',
       cancellationReason: 'Candidate accepted another offer at a competitor.',
       hosts: {
