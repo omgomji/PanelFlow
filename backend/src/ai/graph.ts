@@ -179,6 +179,7 @@ async function dbQuery(state: typeof PanelFlowState.State) {
     query: state.searchQuery,
     meetingId: state.meetingId,
     timezone: state.timezone,
+    upcoming: /\b(upcoming|next|future)\b/i.test(state.query),
   });
   return { databaseContext: result.context, citations: result.citations };
 }

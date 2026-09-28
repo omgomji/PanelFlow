@@ -19,17 +19,23 @@ export async function queryMeetings(params: {
   query?: string;
   meetingId?: number | null;
   timezone: string;
+  upcoming?: boolean;
 }): Promise<{ context: Record<string, unknown>; citations: Citation[] }> {
   const where: any = { ...bookingAccessWhere(params.userId, params.role) };
+  const isUpcoming = params.upcoming === true;
 
   if (params.meetingId) where.id = params.meetingId;
-  const from = parseLocalBoundary(params.dateFrom || undefined, params.timezone);
-  const to = parseLocalBoundary(params.dateTo || params.dateFrom || undefined, params.timezone, true);
+  const from = isUpcoming ? undefined : parseLocalBoundary(params.dateFrom || undefined, params.timezone);
+  const to = isUpcoming ? undefined : parseLocalBoundary(params.dateTo || params.dateFrom || undefined, params.timezone, true);
   if (from || to) {
     where.startTime = {
       ...(from ? { gte: from } : {}),
       ...(to ? { lte: to } : {}),
     };
+  }
+
+  if (isUpcoming) {
+    where.startTime = { ...(where.startTime || {}), gte: new Date() };
   }
 
   if (params.operation === 'meeting_count' || params.operation === 'meeting_list') {
@@ -54,7 +60,7 @@ export async function queryMeetings(params: {
     where.startTime = { ...(where.startTime || {}), lt: new Date() };
     const bookings = await prisma.booking.findMany({
       where,
-      orderBy: { startTime: 'desc' },
+      orderBy: { startTime: isUpcoming ? 'asc' : 'desc' },
       take: 1,
       include: { eventType: true, panel: { include: { position: true } }, hosts: true },
     });
@@ -89,7 +95,7 @@ export async function queryMeetings(params: {
 
   const bookings = await prisma.booking.findMany({
     where,
-    orderBy: { startTime: 'desc' },
+    orderBy: { startTime: isUpcoming ? 'asc' : 'desc' },
     take: 12,
     include: { eventType: true, panel: { include: { position: true } }, hosts: true },
   });
