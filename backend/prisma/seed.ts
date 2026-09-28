@@ -483,6 +483,52 @@ async function main() {
     }
   });
 
+  // 6. Recurring future meetings across roughly 60 days, through early December
+  const futureCandidates = [
+    { name: 'Nina Patel', email: 'nina.patel@example.com' },
+    { name: 'Owen Brooks', email: 'owen.brooks@example.com' },
+    { name: 'Maya Singh', email: 'maya.singh@example.com' },
+    { name: 'Ethan Clark', email: 'ethan.clark@example.com' },
+    { name: 'Ava Thompson', email: 'ava.thompson@example.com' },
+    { name: 'Noah Williams', email: 'noah.williams@example.com' },
+  ];
+  const futurePanels = [
+    { panelId: pos1_panel1.id, duration: 60, interviewerIds: [emily.id, michael.id], time: '10:00' },
+    { panelId: pos2_panel1.id, duration: 45, interviewerIds: [jessica.id, james.id], time: '13:00' },
+    { panelId: pos1_panel2.id, duration: 60, interviewerIds: [sarah.id, david.id], time: '15:00' },
+  ];
+
+  let candidateIndex = 0;
+  for (let week = 0; week < 9; week += 1) {
+    for (const [meetingIndex, panel] of futurePanels.entries()) {
+      const meetingDateOffset = 7 + week * 7 + meetingIndex * 2;
+      const startTime = toUtcFromIst(now, meetingDateOffset, panel.time);
+      const endTime = new Date(startTime.getTime() + panel.duration * 60_000);
+      const candidate = futureCandidates[candidateIndex % futureCandidates.length];
+      candidateIndex += 1;
+
+      await prisma.booking.create({
+        data: {
+          panel: { connect: { id: panel.panelId } },
+          inviteeName: candidate.name,
+          inviteeEmail: candidate.email,
+          startTime,
+          endTime,
+          durationMinutes: panel.duration,
+          status: 'SCHEDULED',
+          hosts: {
+            create: panel.interviewerIds.map((userId) => ({
+              userId,
+              startTime,
+              endTime,
+              status: 'SCHEDULED' as const,
+            })),
+          },
+        },
+      });
+    }
+  }
+
   console.log('✅ Database seeded successfully!');
   console.log('\n📋 Seeded credentials:');
   console.log('  ADMIN:       om@example.com     / password123');
