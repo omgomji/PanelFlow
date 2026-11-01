@@ -44,6 +44,12 @@ export const panelsController = {
     res.json(panel);
   },
 
+  async remove(req: Request, res: Response) {
+    const id = parseInt(String(req.params.id), 10);
+    const panel = await panelsService.remove(id);
+    res.json(panel);
+  },
+
   async addInterviewer(req: Request, res: Response) {
     const panelId = parseInt(String(req.params.id), 10);
     const { userId } = req.body as { userId?: number };

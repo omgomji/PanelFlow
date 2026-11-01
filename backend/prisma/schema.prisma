@@ -42,6 +42,7 @@ model User {
   refreshSessions      RefreshSession[]
   tokenVersion         Int                   @default(0)
   aiAccessVersion      Int                   @default(0)
+  invitationsCreated   Invitation[]
 }
 
 model EventType {
@@ -220,6 +221,22 @@ model RefreshSession {
   @@index([userId, expiresAt])
 }
 
+model Invitation {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  role      Role     @default(INTERVIEWER)
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  createdBy Int?
+  createdByUser User? @relation(fields: [createdBy], references: [id])
+
+  @@index([email])
+  @@index([token])
+  @@index([expiresAt])
+}
+
 enum Recommendation {
   STRONG_NO
   NO
@@ -244,15 +261,15 @@ model Feedback {
 
 model RagSource {
   id           String   @id @default(uuid()) @db.Uuid
-  sourceType   String
-  sourceId     String
-  contentHash  String
-  indexVersion Int      @default(1)
-  chunkCount   Int      @default(0)
-  indexedAt    DateTime?
-  lastError    String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  sourceType   String   @map("source_type")
+  sourceId     String   @map("source_id")
+  contentHash  String   @map("content_hash")
+  indexVersion Int      @default(1) @map("index_version")
+  chunkCount   Int      @default(0) @map("chunk_count")
+  indexedAt    DateTime? @map("indexed_at")
+  lastError    String?  @map("last_error")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@unique([sourceType, sourceId])
   @@index([sourceType])

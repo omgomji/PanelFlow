@@ -22,6 +22,23 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { getEffectiveBufferPolicy } from './slots.service';
 import { canManageBooking } from './authorization.service';
 import { indexBooking } from '../ai/indexers/indexer.service';
+import { redis } from '../config/redis';
+import { publishBookingEvent } from '../events/producer';
+
+export async function invalidateSlotCache(panelSlug?: string, hostUserIds: number[] = []) {
+  try {
+    if (panelSlug) {
+      const keys = await redis.keys(`slots:panel:${panelSlug}:*`);
+      if (keys.length) await redis.del(...keys);
+    }
+    for (const userId of hostUserIds) {
+      const userKeys = await redis.keys(`slots:user:${userId}:*`);
+      if (userKeys.length) await redis.del(...userKeys);
+    }
+  } catch (err) {
+    console.warn('[Cache] Eviction failed', err);
+  }
+}
 
 export const bookingsService = {
   /**
@@ -178,7 +195,7 @@ export const bookingsService = {
   async cancel(userId: number, bookingId: number, cancellationReason?: string, role = 'INTERVIEWER') {
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { eventType: true, panel: { include: { position: true } } },
+      include: { eventType: true, panel: { include: { position: true } }, hosts: true },
     });
 
     if (!booking) {
@@ -202,8 +219,12 @@ export const bookingsService = {
       });
     });
 
-    void indexBooking(updatedBooking.id).catch((error) => {
-      console.error('[ai] booking index failed after cancel', { bookingId: updatedBooking.id, error: error instanceof Error ? error.message : String(error) });
+    void publishBookingEvent({
+      type: 'BOOKING_CANCELLED',
+      bookingId: updatedBooking.id,
+      uid: updatedBooking.uid,
+      reason: cancellationReason,
+      hostUserIds: booking.hosts.map((h) => h.userId),
     });
 
     return updatedBooking;
@@ -337,8 +358,15 @@ export const bookingsService = {
       return booking;
     });
 
-    void indexBooking(result.id).catch((error) => {
-      console.error('[ai] booking index failed after create', { bookingId: result.id, error: error instanceof Error ? error.message : String(error) });
+    void publishBookingEvent({
+      type: 'BOOKING_CREATED',
+      bookingId: result.id,
+      uid: result.uid,
+      hostUserIds: [userId],
+      inviteeName: data.inviteeName,
+      inviteeEmail: data.inviteeEmail,
+      startTime: result.startTime.toISOString(),
+      endTime: result.endTime.toISOString(),
     });
 
     return result;
@@ -444,11 +472,57 @@ export const bookingsService = {
       return booking;
     });
 
-    void indexBooking(result.id).catch((error) => {
-      console.error('[ai] booking index failed after create', { bookingId: result.id, error: error instanceof Error ? error.message : String(error) });
+    void publishBookingEvent({
+      type: 'BOOKING_CREATED',
+      bookingId: result.id,
+      uid: result.uid,
+      panelSlug,
+      hostUserIds: panel.interviewers.map((pi) => pi.userId),
+      inviteeName: data.inviteeName,
+      inviteeEmail: data.inviteeEmail,
+      startTime: result.startTime.toISOString(),
+      endTime: result.endTime.toISOString(),
     });
 
     return result;
+  },
+
+  /**
+   * Public candidate-facing cancel: cancels a booking by UID.
+   * Only SCHEDULED bookings can be cancelled. Returns the cancelled booking.
+   */
+  async cancelPublicBooking(uid: string) {
+    const booking = await prisma.booking.findUnique({
+      where: { uid },
+      include: { hosts: true, eventType: true, panel: true },
+    });
+
+    if (!booking) {
+      throw new NotFoundError('Booking not found');
+    }
+    if (booking.status !== 'SCHEDULED') {
+      throw new ConflictError('Only scheduled bookings can be cancelled');
+    }
+
+    const updatedBooking = await prisma.$transaction(async (tx) => {
+      await tx.bookingHost.updateMany({
+        where: { bookingId: booking.id },
+        data: { status: 'CANCELLED' },
+      });
+      return tx.booking.update({
+        where: { id: booking.id },
+        data: { status: 'CANCELLED' },
+      });
+    });
+
+    void publishBookingEvent({
+      type: 'BOOKING_CANCELLED',
+      bookingId: updatedBooking.id,
+      uid: updatedBooking.uid,
+      hostUserIds: booking.hosts.map((h) => h.userId),
+    });
+
+    return updatedBooking;
   },
 
   /**
@@ -460,11 +534,12 @@ export const bookingsService = {
       include: {
         eventType: true,
         user: true,
+        hosts: true,
         panel: {
           include: {
             position: { select: { title: true } },
             interviewers: {
-              include: { user: { select: { name: true } } },
+              include: { user: { select: { name: true, email: true } } },
             },
           },
         },
@@ -617,8 +692,14 @@ export const bookingsService = {
       }
     });
 
-    void Promise.all([oldBooking.id, result.id].map((id) => indexBooking(id))).catch((error) => {
-      console.error('[ai] booking index failed after reschedule', { oldBookingId: oldBooking.id, newBookingId: result.id, error: error instanceof Error ? error.message : String(error) });
+    void publishBookingEvent({
+      type: 'BOOKING_RESCHEDULED',
+      oldBookingId: oldBooking.id,
+      newBookingId: result.id,
+      uid: result.uid,
+      hostUserIds: oldBooking.hosts.map((h) => h.userId),
+      newStartTime: result.startTime.toISOString(),
+      newEndTime: result.endTime.toISOString(),
     });
 
     return result;

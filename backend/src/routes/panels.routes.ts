@@ -16,6 +16,7 @@ const router = Router();
 router.get('/my', panelsController.myPanels);
 router.get('/:id', panelsController.getById);
 router.put('/:id', requireRole('ADMIN'), panelsController.update);
+router.delete('/:id', requireRole('ADMIN'), panelsController.remove);
 router.post('/:id/interviewers', requireRole('ADMIN'), panelsController.addInterviewer);
 router.delete('/:id/interviewers/:userId', requireRole('ADMIN'), panelsController.removeInterviewer);
 

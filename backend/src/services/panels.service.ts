@@ -96,6 +96,12 @@ export const panelsService = {
         },
       },
     });
+    if (data.interviewerIds?.length) {
+      await prisma.user.updateMany({
+        where: { id: { in: data.interviewerIds } },
+        data: { aiAccessVersion: { increment: 1 } },
+      });
+    }
     void safeReindexPanelAndBookings(created.id, 'panel created');
     return created;
   },
@@ -132,6 +138,24 @@ export const panelsService = {
     });
     void safeReindexPanelAndBookings(updated.id, 'panel updated');
     return updated;
+  },
+
+  async remove(id: number) {
+    const panel = await prisma.panel.findUnique({ where: { id } });
+    if (!panel) throw new NotFoundError('Panel not found');
+
+    const archived = await prisma.panel.update({
+      where: { id },
+      data: { isActive: false },
+      include: {
+        position: { select: { id: true, title: true } },
+        interviewers: {
+          include: { user: { select: { id: true, name: true, email: true } } },
+        },
+      },
+    });
+    void safeReindexPanelAndBookings(id, 'panel archived');
+    return archived;
   },
 
   async addInterviewer(panelId: number, userId: number) {

@@ -26,10 +26,12 @@ function setCookieOptions(isProd: boolean, maxAge: number) {
 
 export const authController = {
   async register(req: Request, res: Response) {
-    const { name, email, password } = req.body as {
+    const { name, email, password, token, inviteToken } = req.body as {
       name?: string;
       email?: string;
       password?: string;
+      token?: string;
+      inviteToken?: string;
     };
 
     if (!name || !email || !password) {
@@ -39,7 +41,12 @@ export const authController = {
       throw new BadRequestError('Password must be at least 8 characters');
     }
 
-    const user = await authService.register({ name, email, password });
+    const user = await authService.register({
+      name,
+      email,
+      password,
+      inviteToken: inviteToken || token,
+    });
     res.status(201).json({ user });
   },
 

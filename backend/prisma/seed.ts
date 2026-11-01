@@ -2,19 +2,23 @@
  * Database Seed Script
  *
  * Populates the database with realistic sample data for development and demo:
- *   - 1 ADMIN user (om, username: om) with bcrypt-hashed password
- *   - 6 INTERVIEWER users with realistic names and roles, password 'password123'
+ *   - 1 ADMIN user with bcrypt-hashed password
+ *   - 6 INTERVIEWER users with realistic names and roles
  *   - Monday–Friday availability for all users
- *   - 4 event types for admin (15 min, 30 min, 45 min, 60 min)
- *   - Realistic sample bookings (individual)
- *   - 4 Realistic Positions with multiple panels and assigned interviewers
- *   - Panel bookings: past with disagreement, detailed feedback, upcoming, no-show, cancelled
+ *   - 4 event types for admin (individual booking flow)
+ *   - Realistic sample bookings (individual + panel)
+ *   - 4 Positions with multiple panels and assigned interviewers
+ *   - Panel bookings with feedback (agreement, disagreement, strong yes)
+ *   - Rescheduled and cancelled bookings
+ *   - Candidate history across positions
+ *   - Invitation records (pending, used, expired)
+ *   - Workload and calibration data for analytics
  *
  * Run with: npx prisma db seed
  */
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { addDays } from 'date-fns';
+import { addDays, addHours } from 'date-fns';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 
 const prisma = new PrismaClient();
@@ -55,16 +59,17 @@ async function main() {
   await prisma.bookingHost.deleteMany();
   await prisma.panelInterviewer.deleteMany();
   await prisma.booking.deleteMany();
+  await prisma.invitation.deleteMany();
   await prisma.panel.deleteMany();
   await prisma.position.deleteMany();
+  await prisma.eventType.deleteMany();
+  await prisma.contact.deleteMany();
+  await prisma.refreshSession.deleteMany();
   await prisma.availabilityDateOverrideInterval.deleteMany();
   await prisma.availabilityDateOverride.deleteMany();
   await prisma.availabilityInterval.deleteMany();
   await prisma.availabilityDay.deleteMany();
   await prisma.availabilitySchedule.deleteMany();
-  await prisma.contact.deleteMany();
-  await prisma.eventType.deleteMany();
-  await prisma.refreshSession.deleteMany();
   await prisma.user.deleteMany();
 
   console.log('🔑 Hashing passwords...');
@@ -150,7 +155,7 @@ async function main() {
     },
   });
 
-  await prisma.eventType.create({
+  const systemDesign60 = await prisma.eventType.create({
     data: {
       userId: admin.id,
       title: '60 Min System Design',
@@ -189,11 +194,11 @@ async function main() {
     ],
   });
 
-  // ── Sample Bookings (individual) ───────────────────────────
-  console.log('📌 Seeding sample bookings...');
+  // ── Individual Bookings ────────────────────────────────────
+  console.log('📌 Seeding individual bookings...');
   const now = new Date();
 
-  // Tomorrow, 10:00 AM
+  // Tomorrow, 10:00 AM — SCHEDULED
   const tomorrow = toUtcFromIst(now, 1, '10:00');
   const booking1 = await prisma.booking.create({
     data: {
@@ -205,19 +210,18 @@ async function main() {
       endTime: new Date(tomorrow.getTime() + 15 * 60_000),
       durationMinutes: 15,
       status: 'SCHEDULED',
-    },
-  });
-  await prisma.bookingHost.create({
-    data: {
-      bookingId: booking1.id,
-      userId: admin.id,
-      startTime: tomorrow,
-      endTime: new Date(tomorrow.getTime() + 15 * 60_000),
-      status: 'SCHEDULED',
+      hosts: {
+        create: {
+          userId: admin.id,
+          startTime: tomorrow,
+          endTime: new Date(tomorrow.getTime() + 15 * 60_000),
+          status: 'SCHEDULED',
+        },
+      },
     },
   });
 
-  // Day After Tomorrow, 2:30 PM
+  // Day After Tomorrow, 2:30 PM — SCHEDULED
   const dayAfter = toUtcFromIst(now, 2, '14:30');
   const booking2 = await prisma.booking.create({
     data: {
@@ -229,19 +233,18 @@ async function main() {
       endTime: new Date(dayAfter.getTime() + 30 * 60_000),
       durationMinutes: 30,
       status: 'SCHEDULED',
-    },
-  });
-  await prisma.bookingHost.create({
-    data: {
-      bookingId: booking2.id,
-      userId: admin.id,
-      startTime: dayAfter,
-      endTime: new Date(dayAfter.getTime() + 30 * 60_000),
-      status: 'SCHEDULED',
+      hosts: {
+        create: {
+          userId: admin.id,
+          startTime: dayAfter,
+          endTime: new Date(dayAfter.getTime() + 30 * 60_000),
+          status: 'SCHEDULED',
+        },
+      },
     },
   });
 
-  // Yesterday, 11:00 AM
+  // Yesterday, 11:00 AM — SCHEDULED (past, for workload history)
   const yesterday = toUtcFromIst(now, -1, '11:00');
   const booking3 = await prisma.booking.create({
     data: {
@@ -253,19 +256,18 @@ async function main() {
       endTime: new Date(yesterday.getTime() + 45 * 60_000),
       durationMinutes: 45,
       status: 'SCHEDULED',
-    },
-  });
-  await prisma.bookingHost.create({
-    data: {
-      bookingId: booking3.id,
-      userId: admin.id,
-      startTime: yesterday,
-      endTime: new Date(yesterday.getTime() + 45 * 60_000),
-      status: 'SCHEDULED',
+      hosts: {
+        create: {
+          userId: admin.id,
+          startTime: yesterday,
+          endTime: new Date(yesterday.getTime() + 45 * 60_000),
+          status: 'SCHEDULED',
+        },
+      },
     },
   });
 
-  // Two Days Ago, Cancelled
+  // Two Days Ago — CANCELLED
   const twoDaysAgo = toUtcFromIst(now, -2, '15:00');
   const booking4 = await prisma.booking.create({
     data: {
@@ -278,21 +280,43 @@ async function main() {
       durationMinutes: 15,
       status: 'CANCELLED',
       cancellationReason: 'Candidate had a last minute emergency.',
-    },
-  });
-  await prisma.bookingHost.create({
-    data: {
-      bookingId: booking4.id,
-      userId: admin.id,
-      startTime: twoDaysAgo,
-      endTime: new Date(twoDaysAgo.getTime() + 15 * 60_000),
-      status: 'CANCELLED',
+      hosts: {
+        create: {
+          userId: admin.id,
+          startTime: twoDaysAgo,
+          endTime: new Date(twoDaysAgo.getTime() + 15 * 60_000),
+          status: 'CANCELLED',
+        },
+      },
     },
   });
 
-  // ── Positions & Panels ───────────────────────────────────────
+  // Three Days Ago — NO_SHOW
+  const threeDaysAgo = toUtcFromIst(now, -3, '09:00');
+  const booking5 = await prisma.booking.create({
+    data: {
+      eventTypeId: interview30.id,
+      userId: admin.id,
+      inviteeName: 'Robin Kim',
+      inviteeEmail: 'robin.kim@example.com',
+      startTime: threeDaysAgo,
+      endTime: new Date(threeDaysAgo.getTime() + 30 * 60_000),
+      durationMinutes: 30,
+      status: 'NO_SHOW',
+      hosts: {
+        create: {
+          userId: admin.id,
+          startTime: threeDaysAgo,
+          endTime: new Date(threeDaysAgo.getTime() + 30 * 60_000),
+          status: 'NO_SHOW',
+        },
+      },
+    },
+  });
+
+  // ── Positions & Panels ─────────────────────────────────────
   console.log('🏢 Seeding positions and panels...');
-  
+
   const pos1 = await prisma.position.create({
     data: {
       title: 'Full Stack Engineer (React/Node)',
@@ -301,25 +325,31 @@ async function main() {
       createdById: admin.id,
     },
   });
-  
-  const pos1_panel1 = await prisma.panel.create({
+
+  const pos1Panel1 = await prisma.panel.create({
     data: {
       positionId: pos1.id,
       title: 'Frontend Deep Dive',
       slug: 'fullstack-frontend',
       duration: 60,
-      interviewers: { create: [{ userId: emily.id }, { userId: michael.id }] }
-    }
+      isActive: true,
+      interviewers: {
+        create: [{ userId: emily.id }, { userId: michael.id }],
+      },
+    },
   });
 
-  const pos1_panel2 = await prisma.panel.create({
+  const pos1Panel2 = await prisma.panel.create({
     data: {
       positionId: pos1.id,
       title: 'Backend & System Design',
       slug: 'fullstack-backend',
       duration: 60,
-      interviewers: { create: [{ userId: sarah.id }, { userId: david.id }] }
-    }
+      isActive: true,
+      interviewers: {
+        create: [{ userId: sarah.id }, { userId: david.id }],
+      },
+    },
   });
 
   const pos2 = await prisma.position.create({
@@ -328,16 +358,20 @@ async function main() {
       description: 'Seeking a data-driven Product Manager to lead our core engagement squad, working closely with engineering and design.',
       status: 'OPEN',
       createdById: admin.id,
-    }
+    },
   });
-  const pos2_panel1 = await prisma.panel.create({
+
+  const pos2Panel1 = await prisma.panel.create({
     data: {
       positionId: pos2.id,
       title: 'Product Strategy & Vision',
       slug: 'pm-strategy',
       duration: 45,
-      interviewers: { create: [{ userId: jessica.id }, { userId: james.id }] }
-    }
+      isActive: true,
+      interviewers: {
+        create: [{ userId: jessica.id }, { userId: james.id }],
+      },
+    },
   });
 
   const pos3 = await prisma.position.create({
@@ -346,16 +380,20 @@ async function main() {
       description: 'Looking for an experienced Engineering Manager to lead a team of 8 engineers focused on platform reliability.',
       status: 'OPEN',
       createdById: admin.id,
-    }
+    },
   });
-  const pos3_panel1 = await prisma.panel.create({
+
+  const pos3Panel1 = await prisma.panel.create({
     data: {
       positionId: pos3.id,
       title: 'Leadership & People Management',
       slug: 'em-leadership',
       duration: 60,
-      interviewers: { create: [{ userId: emily.id }, { userId: david.id }] }
-    }
+      isActive: true,
+      interviewers: {
+        create: [{ userId: emily.id }, { userId: david.id }],
+      },
+    },
   });
 
   const pos4 = await prisma.position.create({
@@ -364,17 +402,17 @@ async function main() {
       description: 'Requires deep knowledge of Kubernetes, AWS, and CI/CD pipelines.',
       status: 'CLOSED',
       createdById: admin.id,
-    }
+    },
   });
 
-  // ── Sample Panel Bookings (with Feedback) ───────────────────
+  // ── Panel Bookings with Feedback ───────────────────────────
   console.log('📌 Seeding panel bookings and feedback...');
-  
-  // 1. Past Full Stack Backend Panel - Disagreement
+
+  // 1. Past Full Stack Backend Panel — Disagreement (Sarah: YES, David: NO)
   const pastDisagreement = toUtcFromIst(now, -3, '14:00');
   await prisma.booking.create({
     data: {
-      panel: { connect: { id: pos1_panel2.id } }, // Backend & System Design
+      panelId: pos1Panel2.id,
       inviteeName: 'Alex Johnson',
       inviteeEmail: 'alex.j@example.com',
       startTime: pastDisagreement,
@@ -384,69 +422,105 @@ async function main() {
       hosts: {
         create: [
           { userId: sarah.id, startTime: pastDisagreement, endTime: new Date(pastDisagreement.getTime() + 60 * 60_000), status: 'SCHEDULED' },
-          { userId: david.id, startTime: pastDisagreement, endTime: new Date(pastDisagreement.getTime() + 60 * 60_000), status: 'SCHEDULED' }
-        ]
+          { userId: david.id, startTime: pastDisagreement, endTime: new Date(pastDisagreement.getTime() + 60 * 60_000), status: 'SCHEDULED' },
+        ],
       },
       feedback: {
         create: [
-          { interviewerId: sarah.id, recommendation: 'YES', notes: 'Candidate has a solid understanding of Node.js event loop and handled the API design well. Missed a few edge cases on scaling.' },
-          { interviewerId: david.id, recommendation: 'NO', notes: 'Struggled significantly when discussing database indexing and query optimization. Not quite ready for a senior role.' }
-        ]
-      }
-    }
+          {
+            interviewerId: sarah.id,
+            recommendation: 'YES',
+            notes: 'Candidate has a solid understanding of Node.js event loop and handled the API design well. Missed a few edge cases on scaling.',
+          },
+          {
+            interviewerId: david.id,
+            recommendation: 'NO',
+            notes: 'Struggled significantly when discussing database indexing and query optimization. Not quite ready for a senior role.',
+          },
+        ],
+      },
+    },
   });
 
-  // 2. Past Product Manager Panel - Strong Yes
-  const pastPartial = toUtcFromIst(now, -1, '10:00');
+  // 2. Past Product Manager Panel — Strong Yes (Jessica: STRONG_YES, James: YES)
+  const pastStrongYes = toUtcFromIst(now, -1, '10:00');
   await prisma.booking.create({
     data: {
-      panel: { connect: { id: pos2_panel1.id } }, // Product Strategy
+      panelId: pos2Panel1.id,
       inviteeName: 'Samantha Brooks',
       inviteeEmail: 'samantha.b@example.com',
-      startTime: pastPartial,
-      endTime: new Date(pastPartial.getTime() + 45 * 60_000),
+      startTime: pastStrongYes,
+      endTime: new Date(pastStrongYes.getTime() + 45 * 60_000),
       durationMinutes: 45,
       status: 'SCHEDULED',
       hosts: {
         create: [
-          { userId: jessica.id, startTime: pastPartial, endTime: new Date(pastPartial.getTime() + 45 * 60_000), status: 'SCHEDULED' },
-          { userId: james.id, startTime: pastPartial, endTime: new Date(pastPartial.getTime() + 45 * 60_000), status: 'SCHEDULED' }
-        ]
+          { userId: jessica.id, startTime: pastStrongYes, endTime: new Date(pastStrongYes.getTime() + 45 * 60_000), status: 'SCHEDULED' },
+          { userId: james.id, startTime: pastStrongYes, endTime: new Date(pastStrongYes.getTime() + 45 * 60_000), status: 'SCHEDULED' },
+        ],
       },
       feedback: {
         create: [
-          { interviewerId: jessica.id, recommendation: 'STRONG_YES', notes: 'Exceptional product sense. Walked through a complex roadmap prioritization scenario flawlessly. Highly recommend.' },
-          { interviewerId: james.id, recommendation: 'YES', notes: 'Very good communication skills and stakeholder management experience.' }
-        ]
-      }
-    }
+          {
+            interviewerId: jessica.id,
+            recommendation: 'STRONG_YES',
+            notes: 'Exceptional product sense. Walked through a complex roadmap prioritization scenario flawlessly. Highly recommend.',
+          },
+          {
+            interviewerId: james.id,
+            recommendation: 'YES',
+            notes: 'Very good communication skills and stakeholder management experience.',
+          },
+        ],
+      },
+    },
   });
 
-  // 3. Upcoming Full Stack Frontend Panel
-  const upcoming = toUtcFromIst(now, 2, '11:00');
+  // 3. Upcoming Full Stack Frontend Panel — Emily & Michael
+  const upcomingFrontend = toUtcFromIst(now, 2, '11:00');
   await prisma.booking.create({
     data: {
-      panel: { connect: { id: pos1_panel1.id } }, // Frontend Deep Dive
+      panelId: pos1Panel1.id,
       inviteeName: 'Lucas Martinez',
       inviteeEmail: 'lucas.m@example.com',
-      startTime: upcoming,
-      endTime: new Date(upcoming.getTime() + 60 * 60_000),
+      startTime: upcomingFrontend,
+      endTime: new Date(upcomingFrontend.getTime() + 60 * 60_000),
       durationMinutes: 60,
       status: 'SCHEDULED',
       hosts: {
         create: [
-          { userId: emily.id, startTime: upcoming, endTime: new Date(upcoming.getTime() + 60 * 60_000), status: 'SCHEDULED' },
-          { userId: michael.id, startTime: upcoming, endTime: new Date(upcoming.getTime() + 60 * 60_000), status: 'SCHEDULED' }
-        ]
-      }
-    }
+          { userId: emily.id, startTime: upcomingFrontend, endTime: new Date(upcomingFrontend.getTime() + 60 * 60_000), status: 'SCHEDULED' },
+          { userId: michael.id, startTime: upcomingFrontend, endTime: new Date(upcomingFrontend.getTime() + 60 * 60_000), status: 'SCHEDULED' },
+        ],
+      },
+    },
   });
 
-  // 4. NO_SHOW - Engineering Manager Leadership Panel
+  // 4. Upcoming Product Strategy Panel — Jessica & James
+  const upcomingPM = toUtcFromIst(now, 3, '13:00');
+  await prisma.booking.create({
+    data: {
+      panelId: pos2Panel1.id,
+      inviteeName: 'Owen Brooks',
+      inviteeEmail: 'owen.brooks@example.com',
+      startTime: upcomingPM,
+      endTime: new Date(upcomingPM.getTime() + 45 * 60_000),
+      durationMinutes: 45,
+      status: 'SCHEDULED',
+      hosts: {
+        create: [
+          { userId: jessica.id, startTime: upcomingPM, endTime: new Date(upcomingPM.getTime() + 45 * 60_000), status: 'SCHEDULED' },
+          { userId: james.id, startTime: upcomingPM, endTime: new Date(upcomingPM.getTime() + 45 * 60_000), status: 'SCHEDULED' },
+        ],
+      },
+    },
+  });
+
+  // 5. NO_SHOW — Engineering Manager Leadership Panel
   const noShowTime = toUtcFromIst(now, -5, '09:00');
   await prisma.booking.create({
     data: {
-      panel: { connect: { id: pos3_panel1.id } }, // Leadership
+      panelId: pos3Panel1.id,
       inviteeName: 'Marcus Johnson',
       inviteeEmail: 'marcus@example.com',
       startTime: noShowTime,
@@ -456,17 +530,17 @@ async function main() {
       hosts: {
         create: [
           { userId: emily.id, startTime: noShowTime, endTime: new Date(noShowTime.getTime() + 60 * 60_000), status: 'NO_SHOW' },
-          { userId: david.id, startTime: noShowTime, endTime: new Date(noShowTime.getTime() + 60 * 60_000), status: 'NO_SHOW' }
-        ]
-      }
-    }
+          { userId: david.id, startTime: noShowTime, endTime: new Date(noShowTime.getTime() + 60 * 60_000), status: 'NO_SHOW' },
+        ],
+      },
+    },
   });
 
-  // 5. CANCELLED with reason - Product Manager
+  // 6. CANCELLED — Product Manager
   const cancelledTime = toUtcFromIst(now, 4, '13:00');
   await prisma.booking.create({
     data: {
-      panel: { connect: { id: pos2_panel1.id } }, // Product Strategy
+      panelId: pos2Panel1.id,
       inviteeName: 'Lisa Wong',
       inviteeEmail: 'lisa.w@example.com',
       startTime: cancelledTime,
@@ -477,13 +551,14 @@ async function main() {
       hosts: {
         create: [
           { userId: jessica.id, startTime: cancelledTime, endTime: new Date(cancelledTime.getTime() + 45 * 60_000), status: 'CANCELLED' },
-          { userId: james.id, startTime: cancelledTime, endTime: new Date(cancelledTime.getTime() + 45 * 60_000), status: 'CANCELLED' }
-        ]
-      }
-    }
+          { userId: james.id, startTime: cancelledTime, endTime: new Date(cancelledTime.getTime() + 45 * 60_000), status: 'CANCELLED' },
+        ],
+      },
+    },
   });
 
-  // 6. Recurring future meetings across roughly 60 days, through early December
+  // ── Future Recurring Meetings (for workload analytics) ─────
+  console.log('📅 Seeding future recurring meetings...');
   const futureCandidates = [
     { name: 'Nina Patel', email: 'nina.patel@example.com' },
     { name: 'Owen Brooks', email: 'owen.brooks@example.com' },
@@ -491,11 +566,15 @@ async function main() {
     { name: 'Ethan Clark', email: 'ethan.clark@example.com' },
     { name: 'Ava Thompson', email: 'ava.thompson@example.com' },
     { name: 'Noah Williams', email: 'noah.williams@example.com' },
+    { name: 'Lila Rodriguez', email: 'lila.rodriguez@example.com' },
+    { name: 'Ben Carter', email: 'ben.carter@example.com' },
   ];
+
   const futurePanels = [
-    { panelId: pos1_panel1.id, duration: 60, interviewerIds: [emily.id, michael.id], time: '10:00' },
-    { panelId: pos2_panel1.id, duration: 45, interviewerIds: [jessica.id, james.id], time: '13:00' },
-    { panelId: pos1_panel2.id, duration: 60, interviewerIds: [sarah.id, david.id], time: '15:00' },
+    { panelId: pos1Panel1.id, duration: 60, interviewerIds: [emily.id, michael.id], time: '10:00' },
+    { panelId: pos2Panel1.id, duration: 45, interviewerIds: [jessica.id, james.id], time: '13:00' },
+    { panelId: pos1Panel2.id, duration: 60, interviewerIds: [sarah.id, david.id], time: '15:00' },
+    { panelId: pos3Panel1.id, duration: 60, interviewerIds: [emily.id, david.id], time: '11:00' },
   ];
 
   let candidateIndex = 0;
@@ -509,7 +588,7 @@ async function main() {
 
       await prisma.booking.create({
         data: {
-          panel: { connect: { id: panel.panelId } },
+          panelId: panel.panelId,
           inviteeName: candidate.name,
           inviteeEmail: candidate.email,
           startTime,
@@ -521,7 +600,7 @@ async function main() {
               userId,
               startTime,
               endTime,
-              status: 'SCHEDULED' as const,
+              status: 'SCHEDULED',
             })),
           },
         },
@@ -529,11 +608,60 @@ async function main() {
     }
   }
 
+  // ── Invitations (Phase 4) ──────────────────────────────────
+  console.log('✉️  Seeding invitations...');
+
+  // Pending invitation (valid, not yet used)
+  const pendingInvite = await prisma.invitation.create({
+    data: {
+      email: 'new.interviewer@example.com',
+      role: 'INTERVIEWER',
+      token: 'pending_invite_token_123',
+      expiresAt: addDays(now, 2),
+      createdBy: admin.id,
+    },
+  });
+
+  // Used invitation (already registered)
+  const usedInvite = await prisma.invitation.create({
+    data: {
+      email: 'jane.smith@example.com',
+      role: 'INTERVIEWER',
+      token: 'used_invite_token_456',
+      expiresAt: addDays(now, 2),
+      usedAt: addDays(now, -1),
+      createdBy: admin.id,
+    },
+  });
+
+  // Expired invitation (never used)
+  const expiredInvite = await prisma.invitation.create({
+    data: {
+      email: 'expired.candidate@example.com',
+      role: 'ADMIN',
+      token: 'expired_invite_token_789',
+      expiresAt: addDays(now, -2),
+      createdBy: admin.id,
+    },
+  });
+
   console.log('✅ Database seeded successfully!');
   console.log('\n📋 Seeded credentials:');
   console.log('  ADMIN:       om@example.com     / password123');
   console.log('  INTERVIEWER: emily.chen@example.com / password123 (and 5 others)');
-  console.log('\n🔗 Positions and Panels set up for Full Stack, PM, and EM roles.');
+  console.log('\n🔗 Positions and Panels:');
+  console.log(`  1. ${pos1.title} (${pos1.title})`);
+  console.log(`     - ${pos1Panel1.title} (/panel/${pos1Panel1.slug}) — Emily Chen, Michael Rodriguez`);
+  console.log(`     - ${pos1Panel2.title} (/panel/${pos1Panel2.slug}) — Sarah Kim, David Patel`);
+  console.log(`  2. ${pos2.title}`);
+  console.log(`     - ${pos2Panel1.title} (/panel/${pos2Panel1.slug}) — Jessica Taylor, James Wilson`);
+  console.log(`  3. ${pos3.title}`);
+  console.log(`     - ${pos3Panel1.title} (/panel/${pos3Panel1.slug}) — Emily Chen, David Patel`);
+  console.log(`  4. ${pos4.title} (CLOSED)`);
+  console.log('\n📨 Invitations:');
+  console.log(`  - Pending: new.interviewer@example.com (INTERVIEWER, expires in 2 days)`);
+  console.log(`  - Used:    jane.smith@example.com (INTERVIEWER, already registered)`);
+  console.log(`  - Expired: expired.candidate@example.com (ADMIN, expired 2 days ago)`);
 }
 
 main()

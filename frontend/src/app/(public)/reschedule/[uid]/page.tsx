@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getRescheduleDetails, getPanelSlots, getPublicSlots, rescheduleBooking } from '@/lib/api';
-import type { RescheduleDetailsResponse, PublicSlotItem } from '@/types/public';
+import { formatInTimeZone } from 'date-fns-tz';
 import axios from 'axios';
+import { getRescheduleDetails, getPanelSlots, getPublicSlots, rescheduleBooking, cancelPublicBooking } from '@/lib/api';
+import type { RescheduleDetailsResponse, PublicSlotItem } from '@/types/public';
 import { AlertDialog } from '@/components/ui/AlertDialog';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Button } from '@/components/ui/Button';
 import BookingCalendar from '@/components/BookingCalendar';
-import { formatInTimeZone } from 'date-fns-tz';
 import {
   PublicBookingHeader,
   PublicBookingMain,
@@ -27,6 +28,8 @@ export default function ReschedulePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [bookingError, setBookingError] = useState('');
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const [alertInfo, setAlertInfo] = useState({ isOpen: false, title: '', message: '' });
   const showAlert = (title: string, message: string) => setAlertInfo({ isOpen: true, title, message });
@@ -91,6 +94,26 @@ export default function ReschedulePage() {
     }
   };
 
+  const handleCancel = async () => {
+    if (!uid) return;
+    setCancelOpen(false);
+    setCancelling(true);
+    try {
+      await cancelPublicBooking(uid);
+      showAlert('Cancelled', 'Your booking has been cancelled successfully.');
+      const data = await getRescheduleDetails(uid);
+      setEventData(data);
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        showAlert('Cancel error', (err.response?.data as { error?: string } | undefined)?.error || 'Failed to cancel booking.');
+      } else {
+        showAlert('Cancel error', 'Failed to cancel booking. Please try again.');
+      }
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   if (loading) return <PublicLoadingState />;
 
   if (error || !eventData) {
@@ -111,6 +134,7 @@ export default function ReschedulePage() {
     ? (eventData.panel!.position?.title || 'Panel interview')
     : eventData.user!.name;
   const prevBookingDate = new Date(booking.startTime);
+  const canCancel = booking.status === 'SCHEDULED' && new Date(booking.endTime) > new Date();
 
   return (
     <PublicBookingShell>
@@ -182,14 +206,26 @@ export default function ReschedulePage() {
                       {selectedSlot ? 'Confirm the new time for this meeting.' : 'Select a new available time above.'}
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    disabled={!selectedSlot || isSubmitting}
-                    onClick={handleReschedule}
-                    className="min-h-11 w-full sm:w-auto sm:min-w-48 text-sm font-bold uppercase tracking-widest"
-                  >
-                    {isSubmitting ? 'Confirming…' : 'Confirm reschedule'}
-                  </Button>
+                  <div className="flex gap-3 w-full sm:w-auto">
+                    <Button
+                      type="button"
+                      disabled={!selectedSlot || isSubmitting}
+                      onClick={handleReschedule}
+                      className="min-h-11 w-full sm:w-auto sm:min-w-48 text-sm font-bold uppercase tracking-widest"
+                    >
+                      {isSubmitting ? 'Confirming…' : 'Confirm reschedule'}
+                    </Button>
+                    {canCancel && (
+                      <Button
+                        variant="danger"
+                        disabled={cancelling}
+                        onClick={() => setCancelOpen(true)}
+                        className="min-h-11 w-full sm:w-auto sm:min-w-48 text-sm font-bold uppercase tracking-widest"
+                      >
+                        {cancelling ? 'Cancelling…' : 'Cancel Booking'}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             </section>
@@ -197,7 +233,24 @@ export default function ReschedulePage() {
         </div>
       </PublicBookingMain>
 
-      <AlertDialog isOpen={alertInfo.isOpen} title={alertInfo.title} message={alertInfo.message} onClose={closeAlert} />
+      <ConfirmDialog
+        isOpen={cancelOpen}
+        title="Cancel Booking"
+        message="Are you sure you want to cancel this booking? This cannot be undone."
+        confirmText="Cancel Booking"
+        cancelText="Keep Booking"
+        variant="danger"
+        onConfirm={handleCancel}
+        onCancel={() => setCancelOpen(false)}
+      />
+
+      <AlertDialog
+        isOpen={alertInfo.isOpen}
+        title={alertInfo.title}
+        message={alertInfo.message}
+        onClose={closeAlert}
+        buttonText="Dismiss"
+      />
     </PublicBookingShell>
   );
 }

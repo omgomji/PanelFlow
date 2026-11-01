@@ -25,6 +25,8 @@ import { AlertDialog } from '@/components/ui/AlertDialog';
 
 import { DataTable, DataTableHeader, DataTableBody, DataTableRow, DataTableHead, DataTableCell } from '@/components/ui/DataTable';
 import { StampChip } from '@/components/ui/StampChip';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 
 export default function MeetingsPage() {
   const [meetings, setMeetings] = useState<MeetingRecord[]>([]);
@@ -52,7 +54,16 @@ export default function MeetingsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
   const dateRangeRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   const tabs = ['Upcoming', 'Past', 'Date Range'];
 
@@ -422,7 +433,96 @@ export default function MeetingsPage() {
               <div className="h-7 w-7 animate-spin rounded-full border-b-2 border-stamp" />
             </div>
           ) : totalCount > 0 ? (
-            <DataTable>
+            <>
+              {isMobile ? (
+                <div className="space-y-3" role="list" aria-label="Meetings">
+                  {filteredMeetings.map((meeting) => {
+                    const isCancelled = meeting.status === 'CANCELLED';
+                    const isNoShow = meeting.status === 'NO_SHOW';
+                    const isUpcoming = new Date(meeting.startTime).getTime() >= Date.now();
+                    const canCancel = isUpcoming && !isCancelled && !isNoShow;
+                    const canMarkNoShow = !isUpcoming && !isCancelled && !isNoShow;
+
+                    return (
+                      <article
+                        key={meeting.id}
+                        className="border-2 border-ink bg-paper p-4 rounded-sm"
+                        role="listitem"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
+                          <div className="flex-1">
+                            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-ink/45">
+                              {new Date(meeting.startTime).toLocaleDateString(undefined, {
+                                weekday: 'short',
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              })}
+                            </p>
+                            <h4 className="font-display text-base font-bold text-ink mt-1">
+                              {meeting.inviteeName || 'Invitee'}
+                            </h4>
+                            <p className="text-sm text-ink/70 font-mono mt-1">
+                              {meeting.eventType?.title || 'Meeting'}
+                            </p>
+                          </div>
+                          <div className="flex items-end gap-2">
+                            <StatusBadge
+                              status={isCancelled ? 'cancelled' : isNoShow ? 'no-show' : 'active'}
+                              label={isCancelled ? 'Cancelled' : isNoShow ? 'No Show' : 'Scheduled'}
+                            />
+                          </div>
+                        </div>
+                        <div className="border-t border-clay/30 pt-3 flex items-center justify-between gap-3">
+                          <p className="text-xs font-mono text-ink/60">
+                            {new Date(meeting.startTime).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            {canCancel && meeting.uid && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => window.open(`/reschedule/${meeting.uid}`, '_blank')}
+                              >
+                                RESCHEDULE
+                              </Button>
+                            )}
+                            {canCancel && (
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                onClick={() => handleCancelMeetingClick(meeting.id)}
+                                disabled={cancellingId === meeting.id}
+                              >
+                                {cancellingId === meeting.id ? 'CANCELLING...' : 'CANCEL'}
+                              </Button>
+                            )}
+                            {canMarkNoShow && (
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                onClick={() => handleMarkNoShowClick(meeting.id)}
+                                disabled={markingNoShowId === meeting.id}
+                              >
+                                {markingNoShowId === meeting.id ? 'MARKING...' : 'MARK NO-SHOW'}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        {isCancelled && meeting.cancellationReason && (
+                          <p className="mt-3 text-xs text-ink/60 font-mono">
+                            <span className="font-bold text-ink">Reason:</span> {meeting.cancellationReason}
+                          </p>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <DataTable>
               <DataTableHeader>
                 <DataTableRow>
                   <DataTableHead>Date & Time</DataTableHead>
@@ -507,6 +607,8 @@ export default function MeetingsPage() {
                 })}
               </DataTableBody>
             </DataTable>
+              )}
+            </>
           ) : (
             <div className="flex h-[260px] flex-col items-center justify-center text-center">
               <span className="material-symbols-outlined text-[48px] text-clay/60 mb-4">calendar_month</span>

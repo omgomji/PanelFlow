@@ -57,7 +57,7 @@ api.interceptors.response.use(
 );
 
 // ── Auth ─────────────────────────────────────────────────────
-export const register = async (data: { name: string; email: string; password: string }) => {
+export const register = async (data: { name: string; email: string; password: string; inviteToken?: string }) => {
   const response = await api.post<{ user: AuthUser }>('/auth/register', data);
   return response.data;
 };
@@ -218,6 +218,41 @@ export const getRescheduleDetails = async (uid: string): Promise<RescheduleDetai
   return response.data;
 };
 
+export const cancelPublicBooking = async (uid: string): Promise<{ success: boolean }> => {
+  const response = await api.post<{ success: boolean }>(`/public/cancel/${uid}`);
+  return response.data;
+};
+
+// ── Candidate Portal ──
+export interface CandidatePortalResponse {
+  uid: string;
+  inviteeName: string;
+  inviteeEmail: string;
+  status: 'SCHEDULED' | 'RESCHEDULED' | 'CANCELLED' | 'EXPIRED' | 'NOT_FOUND';
+  timezone: string;
+  currentDateTime: string;
+  rounds: Array<{
+    bookingId: number;
+    panelTitle: string;
+    positionTitle: string;
+    startTime: string;
+    endTime: string;
+    status: string;
+    durationMinutes: number;
+    interviewers: Array<{ id: number; name: string; email?: string }>;
+  }>;
+  preparation?: { notes?: string; checklist?: string[] };
+  notification?: { emailSent: boolean; emailAt?: string; icsDownloaded: boolean };
+  canReschedule: boolean;
+  canCancel: boolean;
+  cancelReason?: string;
+}
+
+export const getCandidatePortal = async (uid: string): Promise<CandidatePortalResponse> => {
+  const response = await api.get<CandidatePortalResponse>(`/public/portal/${uid}`);
+  return response.data;
+};
+
 export const rescheduleBooking = async (uid: string, startTime: string, timezone = Intl.DateTimeFormat().resolvedOptions().timeZone): Promise<CreatedBooking> => {
   const response = await api.post<CreatedBooking>(`/public/reschedule/${uid}`, { startTime, timezone });
   return response.data;
@@ -280,6 +315,19 @@ export const createPanel = async (
   return response.data;
 };
 
+export const updatePanel = async (
+  id: number,
+  data: { title?: string; slug?: string; duration?: number; isActive?: boolean }
+): Promise<Panel> => {
+  const response = await api.put<Panel>(`/panels/${id}`, data);
+  return response.data;
+};
+
+export const deletePanel = async (id: number): Promise<Panel> => {
+  const response = await api.delete<Panel>(`/panels/${id}`);
+  return response.data;
+};
+
 
 
 export const updateUser = async (updates: { timezone?: string }): Promise<{ user: AuthUser }> => {
@@ -290,13 +338,127 @@ export const updateUser = async (updates: { timezone?: string }): Promise<{ user
 
 
 // ── Admin: Users ──────────────────────────────────────────────
+export const getUsers = async (params?: { role?: 'ADMIN' | 'INTERVIEWER' }): Promise<AuthUser[]> => {
+  const response = await api.get<AuthUser[]>('/admin/users', { params });
+  return response.data;
+};
+
 export const getInterviewers = async (): Promise<AuthUser[]> => {
   const response = await api.get<AuthUser[]>('/users', { params: { role: 'INTERVIEWER' } });
   return response.data;
 };
 
+export const inviteUser = async (data: { email: string; role: 'ADMIN' | 'INTERVIEWER' }): Promise<{ inviteUrl: string; token: string }> => {
+  const response = await api.post('/admin/invitations', data);
+  return response.data;
+};
+
+// ── Admin: Invitations ──
+export interface InvitationRow {
+  id: number;
+  email: string;
+  role: 'ADMIN' | 'INTERVIEWER';
+  expiresAt: string;
+  usedAt: string | null;
+  createdAt: string;
+  createdBy: { id: number; name: string; email: string } | null;
+  isActive: boolean;
+}
+
+export const getInvitations = async (params?: { active?: boolean }): Promise<InvitationRow[]> => {
+  const response = await api.get<InvitationRow[]>('/admin/invitations', { params });
+  return response.data;
+};
+
+export const revokeInvitation = async (id: number): Promise<{ success: boolean }> => {
+  const response = await api.delete<{ success: boolean }>(`/admin/invitations/${id}`);
+  return response.data;
+};
+
+export const resendInvitation = async (id: number): Promise<{ inviteUrl: string; token: string; expiresAt: string }> => {
+  const response = await api.post<{ inviteUrl: string; token: string; expiresAt: string }>(`/admin/invitations/${id}/resend`);
+  return response.data;
+};
+
 export const getAdminWorkload = async (days: number = 30): Promise<WorkloadRow[]> => {
   const response = await api.get<WorkloadRow[]>('/admin/workload', { params: { days } });
+  return response.data;
+};
+
+export const getFeedbackCompletion = async (params?: {
+  days?: number;
+  positionId?: number;
+}): Promise<{
+  totalBookings: number;
+  fullyReviewed: number;
+  overdue: number;
+  completionRate: number;
+  avgDelayMinutes: number;
+}> => {
+  const response = await api.get('/admin/feedback-completion', { params });
+  return response.data;
+};
+
+export const getCandidatesByPosition = async (params?: {
+  positionId?: number;
+  days?: number;
+}): Promise<{
+  position: { id: number; title: string } | null;
+  candidates: Array<{
+    inviteeName: string;
+    inviteeEmail: string;
+    interviews: Array<{
+      bookingId: number;
+      panelTitle: string;
+      positionTitle: string;
+      startTime: string;
+      endTime: string;
+      status: string;
+      feedbackCount: number;
+      hostCount: number;
+      feedback: Array<{
+        interviewerId: number;
+        interviewerName: string;
+        recommendation: string;
+        notes?: string;
+        createdAt: string;
+      }>;
+    }>;
+    totalFeedback: number;
+    pendingFeedback: number;
+  }>;
+}> => {
+  const response = await api.get('/admin/candidates', { params });
+  return response.data;
+};
+
+export const getCalibration = async () => {
+  const response = await api.get('/admin/calibration');
+  return response.data;
+};
+
+// ── Admin: System Status ──
+export interface SystemStatus {
+  email: {
+    configured: boolean;
+    provider: string;
+  };
+  kafka: {
+    configured: boolean;
+    mode: 'active' | 'fallback';
+  };
+  redis: {
+    connected: boolean;
+    mode: 'active' | 'fallback';
+  };
+  lastEventProcessingError: {
+    message: string;
+    timestamp: string;
+  } | null;
+}
+
+export const getSystemStatus = async (): Promise<SystemStatus> => {
+  const response = await api.get<SystemStatus>('/admin/system-status');
   return response.data;
 };
 

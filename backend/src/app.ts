@@ -30,7 +30,9 @@ import positionsRouter from './routes/positions.routes';
 import panelsRouter from './routes/panels.routes';
 import usersRouter from './routes/users.routes';
 import adminRouter from './routes/admin.routes';
+import invitationsRouter from './routes/invitations.routes';
 import aiRouter from './routes/ai.routes';
+import eventsRouter from './routes/events.routes';
 import { requireAuth } from './middleware/auth';
 import { errorHandler } from './middleware/errorHandler';
 import { csrfOriginProtection, rateLimit } from './middleware/security';
@@ -68,7 +70,7 @@ app.get('/health', (_req, res) => {
 });
 
 // ── Auth Routes (public) ──────────────────────────────────────
-app.use('/api/auth', rateLimit(20, 15 * 60 * 1000), authRouter);
+app.use('/api/auth', rateLimit(60, 15 * 60 * 1000), authRouter);
 
 // ── Admin Routes ──────────────────────────────────────────────
 // Protected by requireAuth — decodes JWT, attaches req.user = { id, role }.
@@ -80,10 +82,12 @@ app.use('/api/positions', requireAuth, positionsRouter);
 app.use('/api/panels', requireAuth, panelsRouter);
 app.use('/api/users', requireAuth, usersRouter);
 app.use('/api/admin', requireAuth, adminRouter);
+app.use('/api/admin/invitations', requireAuth, invitationsRouter);
 app.use('/api/ai', requireAuth, aiRouter);
 
 // ── Public Routes ────────────────────────────────────────────
 // No auth required — accessed by invitees via booking links.
+app.use('/api/public/events', eventsRouter);
 app.use('/api/public', rateLimit(120, 15 * 60 * 1000), publicRouter);
 
 // ── Global Error Handler ─────────────────────────────────────

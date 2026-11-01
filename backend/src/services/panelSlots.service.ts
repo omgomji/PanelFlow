@@ -19,6 +19,7 @@
 import { addMinutes } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { prisma } from '../config/prisma';
+import { redis } from '../config/redis';
 import { differenceInCalendarDaysInTimezone, getCandidateDayBounds, getFreeIntervalsForUser } from './slots.service';
 import { NotFoundError } from '../utils/errors';
 
@@ -66,6 +67,16 @@ export const panelSlotsService = {
    * so the frontend BookingCalendar component can be reused unchanged.
    */
   async getSlots(panelSlug: string, date: string, candidateTimezone = 'UTC'): Promise<string[]> {
+    const cacheKey = `slots:panel:${panelSlug}:${date}:${candidateTimezone}`;
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch {
+        // Continue to fresh calculation on corrupt cache
+      }
+    }
+
     const panel = await prisma.panel.findUnique({
       where: { slug: panelSlug },
       include: {
@@ -158,6 +169,8 @@ export const panelSlotsService = {
         currentSlot = addMinutes(currentSlot, startTimeIncrementMinutes);
       }
     }
+
+    await redis.set(cacheKey, JSON.stringify(slots), 'EX', 60);
 
     return slots;
   },

@@ -12,6 +12,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { UnauthorizedError, ForbiddenError } from '../utils/errors';
 import { prisma } from '../config/prisma';
+import { redis } from '../config/redis';
 
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
@@ -25,7 +26,7 @@ interface JwtPayload {
   tokenVersion?: number;
 }
 
-export const requireAuth = (req: Request, _res: Response, next: NextFunction): void => {
+export const requireAuth = async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
   const token = req.cookies?.accessToken as string | undefined;
 
   if (!token) {
@@ -34,11 +35,35 @@ export const requireAuth = (req: Request, _res: Response, next: NextFunction): v
 
   try {
     const payload = jwt.verify(token, getJwtSecret()) as JwtPayload;
-    prisma.user.findUnique({ where: { id: payload.userId }, select: { role: true, tokenVersion: true } }).then((user) => {
-      if (!user || user.tokenVersion !== payload.tokenVersion) return next(new UnauthorizedError('Session has been revoked'));
-      req.user = { id: payload.userId, role: user.role };
-      next();
-    }).catch(next);
+    const cacheKey = `user:session:${payload.userId}`;
+
+    let userData: { role: 'ADMIN' | 'INTERVIEWER'; tokenVersion: number } | null = null;
+    const cached = await redis.get(cacheKey);
+
+    if (cached) {
+      try {
+        userData = JSON.parse(cached);
+      } catch {
+        userData = null;
+      }
+    }
+
+    if (!userData) {
+      const user = await prisma.user.findUnique({
+        where: { id: payload.userId },
+        select: { role: true, tokenVersion: true },
+      });
+      if (!user) return next(new UnauthorizedError('Session has been revoked'));
+      userData = user;
+      await redis.set(cacheKey, JSON.stringify(userData), 'EX', 300);
+    }
+
+    if (userData.tokenVersion !== payload.tokenVersion) {
+      return next(new UnauthorizedError('Session has been revoked'));
+    }
+
+    req.user = { id: payload.userId, role: userData.role };
+    next();
   } catch {
     next(new UnauthorizedError('Invalid or expired token'));
   }

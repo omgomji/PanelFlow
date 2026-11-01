@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from 'next-themes';
 
@@ -16,6 +17,7 @@ export default function TopBar({ sidebarWidth, onMobileMenuToggle }: TopBarProps
   const profileButtonRef = useRef<HTMLButtonElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const { user, logout } = useAuth();
+  const router = useRouter();
   const { theme, setTheme, systemTheme } = useTheme();
   const initials = user?.name ? user.name.slice(0, 2).toUpperCase() : 'U';
 
@@ -121,6 +123,7 @@ export default function TopBar({ sidebarWidth, onMobileMenuToggle }: TopBarProps
                   <div className="px-2 py-2 font-display text-[13px] font-semibold text-ink/60">Account settings</div>
                   {[
                     { label: 'My Link', icon: 'link', action: handleCopyLink },
+                    { label: 'Settings', icon: 'settings', action: () => { setProfileOpen(false); router.push('/settings'); } },
                   ].map((item) => (
                     <button
                       key={item.label}

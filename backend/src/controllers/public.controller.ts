@@ -14,9 +14,10 @@ import { generateSlots, getCandidateDayBounds } from '../services/slots.service'
 import { bookingsService } from '../services/bookings.service';
 import { publicService } from '../services/public.service';
 import { formatInTimeZone } from 'date-fns-tz';
-import { BadRequestError, ConflictError } from '../utils/errors';
+import { BadRequestError, ConflictError, NotFoundError } from '../utils/errors';
 import { isValidTimezone, isValidYyyyMmDd } from '../utils/availability.validation';
 import { validateBookableSlot } from '../services/schedulingValidation.service';
+import { generateBookingIcs } from '../utils/calendar.utils';
 
 function normalizeBookingInput(body: Record<string, unknown>) {
   const inviteeName = String(body.inviteeName ?? '').trim();
@@ -311,5 +312,134 @@ export const publicController = {
     );
 
     res.status(201).json(newBooking);
+  },
+
+  async downloadIcs(req: Request, res: Response) {
+    const uid = req.params.uid as string;
+    const booking = await bookingsService.getByUidRaw(uid);
+    if (!booking) throw new NotFoundError('Booking not found');
+
+    const title = booking.panel?.title || booking.eventType?.title || 'Interview';
+    const icsContent = generateBookingIcs({
+      uid: booking.uid,
+      title,
+      description: `Interview for ${booking.panel?.position?.title || 'PanelFlow Meeting'} with ${booking.inviteeName}`,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      organizerName: 'PanelFlow Recruiting',
+      organizerEmail: 'no-reply@panelflow.com',
+      attendeeName: booking.inviteeName,
+      attendeeEmail: booking.inviteeEmail,
+    });
+
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="interview-${booking.uid}.ics"`);
+    res.send(icsContent);
+  },
+
+  /**
+   * POST /api/public/cancel/:uid
+   * Public candidate-facing cancel of a booking by UID.
+   */
+  async cancelBooking(req: Request, res: Response) {
+    const uid = req.params.uid as string;
+    const booking = await bookingsService.cancelPublicBooking(uid);
+    res.json({ success: true, booking });
+  },
+
+  /**
+   * GET /api/public/portal/:uid
+   * Returns the candidate portal view for a booking by UID.
+   */
+  async getCandidatePortal(req: Request, res: Response) {
+    const uid = req.params.uid as string;
+    const booking = await bookingsService.getByUidRaw(uid);
+
+    const isPanel = booking.panelId !== null;
+    const timezone = booking.user?.timezone || 'UTC';
+    const now = new Date();
+
+    const statusMap: Record<string, 'SCHEDULED' | 'RESCHEDULED' | 'CANCELLED' | 'EXPIRED' | 'NOT_FOUND'> = {
+      SCHEDULED: 'SCHEDULED',
+      CANCELLED: 'CANCELLED',
+      NO_SHOW: 'EXPIRED',
+    };
+
+    const rounds = isPanel
+      ? booking.hosts?.map((h: any) => ({
+          bookingId: h.bookingId,
+          panelTitle: booking.panel?.title || 'Panel Interview',
+          positionTitle: booking.panel?.position?.title || 'General Interview',
+          startTime: h.startTime.toISOString(),
+          endTime: h.endTime.toISOString(),
+          status: h.status,
+          durationMinutes: booking.durationMinutes,
+          interviewers: booking.panel?.interviewers?.map((pi: any) => ({
+            id: pi.user.id,
+            name: pi.user.name,
+            email: pi.user.email,
+          })) || [],
+        }))
+      : [{
+          bookingId: booking.id,
+          panelTitle: booking.eventType?.title || 'Interview',
+          positionTitle: 'General Interview',
+          startTime: booking.startTime.toISOString(),
+          endTime: booking.endTime.toISOString(),
+          status: booking.status,
+          durationMinutes: booking.durationMinutes,
+          interviewers: [],
+        }];
+
+    const canReschedule = booking.status === 'SCHEDULED' && booking.endTime > now;
+    const canCancel = booking.status === 'SCHEDULED' && booking.endTime > now;
+
+    res.json({
+      uid: booking.uid,
+      inviteeName: booking.inviteeName,
+      inviteeEmail: booking.inviteeEmail,
+      status: statusMap[booking.status] || 'SCHEDULED',
+      timezone,
+      currentDateTime: now.toISOString(),
+      rounds,
+      preparation: {
+        notes: booking.inviteeNotes,
+        checklist: [],
+      },
+      notification: {
+        emailSent: true,
+        emailAt: booking.createdAt.toISOString(),
+        icsDownloaded: false,
+      },
+      canReschedule,
+      canCancel,
+      panel: isPanel
+        ? {
+            title: booking.panel?.title || '',
+            slug: booking.panel?.slug || '',
+            position: booking.panel?.position ? { title: booking.panel.position.title } : undefined,
+            interviewers: booking.panel?.interviewers?.map((pi: any) => ({
+              id: pi.user.id,
+              name: pi.user.name,
+              email: pi.user.email,
+            })) || [],
+          }
+        : undefined,
+      eventType: booking.eventType
+        ? {
+            id: booking.eventType.id,
+            title: booking.eventType.title,
+            slug: booking.eventType.slug,
+            duration: booking.eventType.duration,
+            description: booking.eventType.description || '',
+          }
+        : undefined,
+      host: booking.user
+        ? {
+            name: booking.user.name,
+            username: booking.user.username,
+          }
+        : undefined,
+    });
   },
 };

@@ -70,21 +70,35 @@ export default function Sidebar({
     { name: 'Availability', href: '/availability', icon: 'schedule' },
     { name: 'Projects & Roles', href: '/positions', icon: 'work' },
     { name: 'Feedback', href: '/feedback', icon: 'rate_review' },
+    { name: 'Analytics', href: '/analytics', icon: 'analytics' },
+    { name: 'Team & Invitations', href: '/team', icon: 'groups' },
     { name: 'Contacts', href: '/contacts', icon: 'person_book' },
-    { name: 'Settings', href: '/settings', icon: 'settings' },
   ];
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
-    if (href === '/settings') return pathname === '/settings';
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
   const openEventTypeCreate = () => {
     setCreateMenuOpen(false);
     onCloseMobile();
-    router.push('/');
-    window.dispatchEvent(new CustomEvent('open-create-event'));
+    router.push('/positions');
+    window.dispatchEvent(new CustomEvent('open-create-event', { detail: { type: 'event-type' } }));
+  };
+
+  const openPanelCreate = () => {
+    setCreateMenuOpen(false);
+    onCloseMobile();
+    router.push('/positions');
+    window.dispatchEvent(new CustomEvent('open-create-event', { detail: { type: 'panel' } }));
+  };
+
+  const openPositionCreate = () => {
+    setCreateMenuOpen(false);
+    onCloseMobile();
+    router.push('/positions');
+    window.dispatchEvent(new CustomEvent('open-create-event', { detail: { type: 'position' } }));
   };
 
 
@@ -154,6 +168,8 @@ export default function Sidebar({
             <div className={`absolute top-[calc(100%+8px)] z-50 ${sidebarCollapsed ? 'left-0' : 'left-0'}`}>
               <CreateMenuPopover
                 onCreateEventType={openEventTypeCreate}
+                onCreatePanel={openPanelCreate}
+                onCreatePosition={openPositionCreate}
               />
             </div>
           ) : null}

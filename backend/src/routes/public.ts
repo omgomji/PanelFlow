@@ -21,9 +21,12 @@ import { panelPublicController } from '../controllers/panelPublic.controller';
 
 const router = Router();
 
-// ── Reschedule ────────────────────────────────────────────────
+// ── Reschedule & Calendar ────────────────────────────────────
 router.get('/reschedule/:uid/details', publicController.getRescheduleDetails);
 router.post('/reschedule/:uid', publicController.rescheduleBooking);
+router.post('/cancel/:uid', publicController.cancelBooking);
+router.get('/portal/:uid', publicController.getCandidatePortal);
+router.get('/bookings/:uid/calendar', publicController.downloadIcs);
 
 // ── Panel Public Routes (must be before /:username) ──────────
 router.get('/panels/:panelSlug', panelPublicController.getPanelDetails);

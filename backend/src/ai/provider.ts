@@ -1,6 +1,7 @@
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ChatGroq } from '@langchain/groq';
 import { aiConfig } from './config';
+import { redis } from '../config/redis';
 
 export type AiProvider = 'gemini' | 'groq';
 
@@ -37,6 +38,9 @@ export function isProviderLimitError(error: unknown): boolean {
 
 export function markGroqUnavailable(error: unknown) {
   groqUnavailableUntil = Date.now() + aiConfig.groqFallbackCooldownMs;
+  if (redis.isConnected) {
+    void redis.set('ai:cooldown:groq', 'active', 'PX', aiConfig.groqFallbackCooldownMs);
+  }
   const candidate = error as { status?: number; code?: string } | null;
   console.warn('[ai] Groq provider temporarily unavailable; using Gemini fallback', {
     status: candidate?.status,

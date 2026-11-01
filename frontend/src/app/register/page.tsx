@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { register as registerApi } from '@/lib/api';
 import axios from 'axios';
 import Link from 'next/link';
@@ -24,7 +24,12 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState('');
+
+  // Invitation support: prefill email and lock it when coming from an invite link
+  const inviteToken = searchParams.get('token') || undefined;
+  const invitedEmail = searchParams.get('email') || '';
 
   const {
     register,
@@ -34,7 +39,7 @@ export default function RegisterPage() {
     resolver: zodResolver(registerSchema),
     defaultValues: {
       name: '',
-      email: '',
+      email: invitedEmail,
       password: '',
     },
   });
@@ -42,7 +47,7 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterFormData) => {
     setError('');
     try {
-      await registerApi(data);
+      await registerApi({ ...data, inviteToken });
       router.push('/login?registered=1');
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
@@ -67,10 +72,18 @@ export default function RegisterPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-center text-xl uppercase tracking-widest text-ink">Create Account</CardTitle>
+            <CardTitle className="text-center text-xl uppercase tracking-widest text-ink">
+              {inviteToken ? 'Accept Invitation' : 'Create Account'}
+            </CardTitle>
           </CardHeader>
 
           <CardContent>
+            {inviteToken && (
+              <div className="mb-6 p-3 rounded-sm border-2 border-sage bg-sage/5 text-sage text-sm font-mono">
+                You&rsquo;re invited to join PanelFlow. Your email is prefilled from your invitation link.
+              </div>
+            )}
+
             {error && (
               <div className="mb-6 border border-oxblood bg-oxblood/10 px-4 py-3 font-mono text-xs text-oxblood">
                 {error}
@@ -103,7 +116,13 @@ export default function RegisterPage() {
                   autoComplete="email"
                   placeholder="you@example.com"
                   {...register('email')}
+                  disabled={Boolean(inviteToken)}
                 />
+                {inviteToken && (
+                  <p className="mt-1 text-xs text-sage font-mono">
+                    Email locked to your invitation: {invitedEmail}
+                  </p>
+                )}
                 {errors.email && (
                   <p className="mt-1 text-xs text-oxblood font-mono">{errors.email.message}</p>
                 )}
@@ -131,7 +150,7 @@ export default function RegisterPage() {
                 disabled={isSubmitting}
                 className="w-full text-sm font-bold uppercase tracking-widest"
               >
-                {isSubmitting ? 'Creating account...' : 'Create account'}
+                {isSubmitting ? 'Creating account...' : inviteToken ? 'Accept invitation' : 'Create account'}
               </Button>
             </form>
 

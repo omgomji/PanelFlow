@@ -10,6 +10,7 @@ import BookingCalendar from '@/components/BookingCalendar';
 import type { PublicSlotItem } from '@/types/public';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { AriaLive } from '@/components/ui/AriaLive';
 import {
   PublicBookingHeader,
   PublicBookingMain,
@@ -47,6 +48,9 @@ export default function PanelBookingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState('');
 
+  // Availability freshness state
+  const [lastChecked, setLastChecked] = useState<Date | null>(null);
+
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   useEffect(() => {
@@ -58,7 +62,9 @@ export default function PanelBookingPage() {
 
   const fetchSlots = useCallback(
     async (date: string): Promise<PublicSlotItem[]> => {
-      return getPanelSlots(panelSlug, date, timezone);
+      const data = await getPanelSlots(panelSlug, date, timezone);
+      setLastChecked(new Date());
+      return data;
     },
     [panelSlug, timezone]
   );
@@ -99,7 +105,7 @@ export default function PanelBookingPage() {
         if (err.response?.status === 409) {
           setStep('calendar');
           setSelectedSlot(null);
-          setBookingError('That slot was just taken. Availability was refreshed; please choose another time.');
+          setBookingError('That slot was just taken by another candidate. Availability has been refreshed — please choose another time.');
           return;
         }
         setBookingError(msg || 'This slot is no longer available. Please pick another.');
@@ -109,6 +115,38 @@ export default function PanelBookingPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleCopyIcs = () => {
+    if (!confirmation) return;
+    const icsContent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//PanelFlow//PanelFlow Calendar 1.0//EN',
+      'BEGIN:VEVENT',
+      `UID:${confirmation.uid}`,
+      `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
+      `DTSTART:${new Date(confirmation.startTime).toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
+      `DTEND:${new Date(confirmation.endTime).toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
+      `SUMMARY:${confirmation.panelTitle}`,
+      `DESCRIPTION:Interview for ${confirmation.positionTitle} with ${confirmation.interviewers.join(', ')}`,
+      `LOCATION:Remote / Google Meet / Zoom`,
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+
+    navigator.clipboard.writeText(icsContent);
+  };
+
+  const handleCopyRescheduleLink = () => {
+    if (!confirmation) return;
+    const link = `${window.location.origin}/reschedule/${confirmation.uid}`;
+    navigator.clipboard.writeText(link);
+  };
+
+  const handleOpenPortal = () => {
+    if (!confirmation) return;
+    window.open(`/portal/${confirmation.uid}`, '_blank');
   };
 
   if (loading) {
@@ -168,6 +206,19 @@ export default function PanelBookingPage() {
                   <span className="material-symbols-outlined text-[18px] text-stamp">public</span>
                   <span>Times shown in <strong className="font-mono text-[11px] text-ink/80">{timezone}</strong></span>
                 </div>
+
+                {/* Availability freshness */}
+                {lastChecked && (
+                  <div className="flex items-center gap-2 mt-2 p-2 rounded-sm border-2 border-clay/30 bg-clay/5">
+                    <span className="material-symbols-outlined text-[14px] text-ink/60">update</span>
+                    <span className="text-[11px] font-mono text-ink/60">
+                      Availability last checked{' '}
+                      <span className="text-stamp font-bold">
+                        {lastChecked.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="mt-6">
@@ -285,12 +336,18 @@ export default function PanelBookingPage() {
 
               {step === 'confirmation' && confirmation && (
                 <div className="flex min-h-72 flex-col items-center justify-center py-8 text-center">
+                  <AriaLive priority="assertive">
+                    Booking confirmed for {confirmation.panelTitle} on {new Date(confirmation.startTime).toLocaleDateString()}. Your panel interview has been successfully scheduled.
+                  </AriaLive>
                   <div className="mb-5 flex h-14 w-14 items-center justify-center border-2 border-sage bg-sage/10 text-sage">
                     <span className="material-symbols-outlined text-[30px]">check</span>
                   </div>
                   <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-sage">Booking confirmed</p>
                   <h2 className="mt-2 font-display text-2xl font-bold tracking-tight text-ink">You&apos;re scheduled</h2>
                   <p className="mt-2 text-sm text-ink/55">Your panel interview has been successfully scheduled.</p>
+                  <p className="mt-1 text-xs text-amber font-mono font-bold">
+                    Booking confirmed. Email delivery may be delayed if notification services are temporarily unavailable.
+                  </p>
 
                   <div className="mt-7 w-full max-w-sm border-2 border-ink p-5 text-left">
                     {[
@@ -323,6 +380,45 @@ export default function PanelBookingPage() {
                         ))}
                       </div>
                     </div>
+                  </div>
+
+                  <div className="mt-7 flex flex-wrap justify-center gap-3">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleCopyIcs}
+                      className="gap-2"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">event</span>
+                      Add to calendar
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleOpenPortal}
+                      className="gap-2"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">person</span>
+                      Open candidate portal
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleCopyRescheduleLink}
+                      className="gap-2"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">content_copy</span>
+                      Copy reschedule link
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => window.location.href = `/panel/${panelSlug}`}
+                      className="gap-2"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                      Return to booking page
+                    </Button>
                   </div>
                 </div>
               )}

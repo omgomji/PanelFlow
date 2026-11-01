@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   format,
   addMonths,
@@ -15,6 +15,7 @@ import {
 } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import type { PublicSlotItem } from '@/types/public';
+import { AriaLive } from '@/components/ui/AriaLive';
 
 interface BookingCalendarProps {
   fetchSlots: (date: string) => Promise<PublicSlotItem[]>;
@@ -32,6 +33,7 @@ export default function BookingCalendar({
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const prevSlotCountRef = useRef<number | null>(null);
 
   const loadSlots = useCallback(
     async (date: Date) => {
@@ -56,6 +58,21 @@ export default function BookingCalendar({
     loadSlots(date);
   };
 
+  // Announce slot availability changes to screen readers
+  useEffect(() => {
+    if (selectedDate === null) {
+      prevSlotCountRef.current = availableSlots.length;
+      return;
+    }
+    const prev = prevSlotCountRef.current;
+    if (prev !== null && availableSlots.length !== prev) {
+      prevSlotCountRef.current = availableSlots.length;
+      // Announcement rendered via AriaLive below
+    } else if (prev === null) {
+      prevSlotCountRef.current = availableSlots.length;
+    }
+  }, [availableSlots, selectedDate]);
+
   useEffect(() => {
     if (!selectedDate) return;
     const refresh = () => void loadSlots(selectedDate);
@@ -70,9 +87,12 @@ export default function BookingCalendar({
     };
   }, [selectedDate, loadSlots]);
 
+  // Fallback polling to refresh slots periodically
   useEffect(() => {
     if (!selectedDate) return;
-    const id = window.setInterval(() => void loadSlots(selectedDate), 15000);
+
+    const id = window.setInterval(() => void loadSlots(selectedDate), 60000);
+
     return () => window.clearInterval(id);
   }, [selectedDate, loadSlots]);
 
@@ -91,6 +111,15 @@ export default function BookingCalendar({
         <h2 className="mt-1 font-display text-xl font-bold tracking-tight text-ink">
           Select a date and time
         </h2>
+
+        {/* ARIA live region for slot refresh announcements */}
+        {availableSlots.length > 0 && prevSlotCountRef.current !== null && availableSlots.length !== prevSlotCountRef.current && (
+          <AriaLive priority="polite">
+            {availableSlots.length > prevSlotCountRef.current
+              ? `${availableSlots.length - prevSlotCountRef.current} new time slot${availableSlots.length - prevSlotCountRef.current !== 1 ? 's' : ''} now available`
+              : `${prevSlotCountRef.current - availableSlots.length} time slot${prevSlotCountRef.current - availableSlots.length !== 1 ? 's' : ''} no longer available`}
+          </AriaLive>
+        )}
       </div>
 
       <div className="mb-6 flex items-center justify-between gap-4">

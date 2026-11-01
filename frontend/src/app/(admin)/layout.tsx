@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import Sidebar from '@/components/Sidebar';
 import TopBar from '@/components/TopBar';
+import { ToastProvider } from '@/components/ui/Toast';
 
 const SIDEBAR_EXPANDED_WIDTH = 230;
 const SIDEBAR_COLLAPSED_WIDTH = 88;
@@ -87,15 +88,15 @@ export default function AdminLayout({
         
         {loadState === 'slow' && (
           <div className="text-center animate-in fade-in duration-500">
-            <p className="text-sm font-medium text-ink/70">Waking up the server&hellip;</p>
-            <p className="text-xs text-ink/40 mt-1">This takes ~15s on first load</p>
+            <p className="text-sm font-bold text-ink">Waking up the server&hellip;</p>
+            <p className="text-xs font-medium text-ink/70 mt-1">This takes ~15s on first load</p>
           </div>
         )}
 
         {loadState === 'woke' && (
           <div className="text-center animate-in zoom-in-95 fade-in duration-300">
-            <p className="text-sm font-medium text-pine">Backend woke up!</p>
-            <p className="text-xs text-pine/60 mt-1">Starting application</p>
+            <p className="text-sm font-bold text-pine">Backend woke up!</p>
+            <p className="text-xs font-medium text-pine/90 mt-1">Starting application</p>
           </div>
         )}
       </div>
@@ -129,7 +130,9 @@ export default function AdminLayout({
           className="flex-1 mt-14 overflow-y-auto bg-paper p-4 sm:p-6 lg:p-10 lg:ml-sidebar transition-all duration-300"
           style={sidebarDesktopStyle}
         >
-          <div className="w-full max-w-5xl">{children}</div>
+          <ToastProvider>
+            <div className="w-full max-w-5xl">{children}</div>
+          </ToastProvider>
         </main>
       </div>
     </div>

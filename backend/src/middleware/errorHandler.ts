@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import * as Sentry from '@sentry/node';
 import { AppError } from '../utils/errors';
 
 /**
@@ -46,5 +47,8 @@ export const errorHandler = (
   }
 
   // ── Fallback ───────────────────────────────────────────────
+  if (process.env.SENTRY_DSN) {
+    Sentry.captureException(err);
+  }
   res.status(500).json({ error: 'Internal server error' });
 };

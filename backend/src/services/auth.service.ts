@@ -14,6 +14,7 @@ import { prisma } from '../config/prisma';
 import { Prisma } from '@prisma/client';
 import crypto from 'crypto';
 import { BadRequestError, ConflictError, UnauthorizedError } from '../utils/errors';
+import { invitationService } from './invitation.service';
 
 const SALT_ROUNDS = 12;
 
@@ -30,11 +31,26 @@ export const authService = {
    * schema default (INTERVIEWER) is ever applied. This prevents privilege
    * escalation via mass assignment even if a client sends role: "ADMIN".
    */
-  async register(data: { name: string; email: string; password: string }) {
+  async register(data: { name: string; email: string; password: string; inviteToken?: string }) {
     const email = data.email.trim().toLowerCase();
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
       throw new BadRequestError('An account with this email already exists');
+    }
+
+    let assignedRole: 'ADMIN' | 'INTERVIEWER' = 'INTERVIEWER';
+    if (data.inviteToken) {
+      try {
+        const payload = jwt.verify(data.inviteToken, getJwtSecret()) as { email: string; role: 'ADMIN' | 'INTERVIEWER'; type: string };
+        if (payload.type === 'invitation' && payload.email.toLowerCase() === email) {
+          assignedRole = payload.role;
+        } else {
+          throw new BadRequestError('Invitation token does not match this email address');
+        }
+      } catch (err) {
+        if (err instanceof BadRequestError) throw err;
+        throw new BadRequestError('Invalid or expired invitation token');
+      }
     }
 
     const passwordHash = await bcrypt.hash(data.password, SALT_ROUNDS);
@@ -44,10 +60,24 @@ export const authService = {
     for (let attempt = 0; attempt < 10; attempt++) {
       const username = attempt === 0 ? base : `${base}${Math.floor(1000 + Math.random() * 9000)}`;
       try {
-        return await prisma.user.create({
-          data: { name: data.name, email, username, passwordHash },
+        const user = await prisma.user.create({
+          data: { name: data.name, email, username, passwordHash, role: assignedRole },
           select: { id: true, name: true, email: true, role: true },
         });
+
+        // Mark the invitation as used so it can't be reused
+        if (data.inviteToken) {
+          await prisma.invitation.updateMany({
+            where: {
+              email,
+              usedAt: null,
+              expiresAt: { gt: new Date() },
+            },
+            data: { usedAt: new Date() },
+          });
+        }
+
+        return user;
       } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') continue;
         throw error;
