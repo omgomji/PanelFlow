@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { register as registerApi } from '@/lib/api';
 import axios from 'axios';
@@ -23,6 +23,21 @@ const registerSchema = z.object({
 type RegisterFormData = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-paper">
+        <div className="w-full max-w-md animate-pulse rounded-xl bg-paper/50 p-8">
+          <div className="h-4 bg-ink/10 rounded w-full mb-4" />
+          <div className="h-4 bg-ink/10 rounded w-3/4" />
+        </div>
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
+  );
+}
+
+function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState('');
@@ -166,4 +181,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-
