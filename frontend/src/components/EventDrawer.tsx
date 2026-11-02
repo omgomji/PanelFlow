@@ -5,8 +5,6 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Switch } from '@/components/ui/Switch';
-import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { useToast } from '@/components/ui/Toast';
 
 export interface EventDrawerData {
@@ -39,7 +37,6 @@ export default function EventDrawer({
   const isEditing = Boolean(initialData?.title);
   const { showToast } = useToast();
 
-  // Controlled state
   const [title, setTitle] = useState(initialData?.title ?? '');
   const [slug, setSlug] = useState(initialData?.slug ?? '');
   const [description, setDescription] = useState(initialData?.description ?? '');
@@ -53,7 +50,6 @@ export default function EventDrawer({
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Reset form whenever initialData changes (create vs edit)
   useEffect(() => {
     setTitle(initialData?.title ?? '');
     setSlug(initialData?.slug ?? '');
@@ -85,22 +81,15 @@ export default function EventDrawer({
   const handleTitleChange = (value: string) => {
     setTitle(value);
     if (!slugManuallyEdited) {
-      setSlug(value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''));
+      setSlug(value.toLowerCase().replace(/\\s+/g, '-').replace(/[^a-z0-9-]/g, ''));
     }
     setErrors((prev) => ({ ...prev, title: '' }));
   };
 
   const handleSlugChange = (value: string) => {
-    setSlug(value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''));
+    setSlug(value.toLowerCase().replace(/\\s+/g, '-').replace(/[^a-z0-9-]/g, ''));
     setSlugManuallyEdited(true);
     setErrors((prev) => ({ ...prev, slug: '' }));
-  };
-
-  const toggleSection = (section: string, setExpandedSections: React.Dispatch<React.SetStateAction<Record<string, boolean>>>) => {
-    setExpandedSections((prev) => ({
-      ...prev,
-      [section]: !prev[section],
-    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -109,7 +98,7 @@ export default function EventDrawer({
 
     setSubmitting(true);
     try {
-      const finalSlug = slug.trim() || title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      const finalSlug = slug.trim() || title.toLowerCase().replace(/\\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
       onSave({
         title: title.trim(),
@@ -129,10 +118,11 @@ export default function EventDrawer({
       });
 
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Something went wrong. Please try again.';
       showToast({
         title: 'Failed to save',
-        message: err?.response?.data?.error || 'Something went wrong. Please try again.',
+        message,
         type: 'error',
       });
     } finally {
@@ -144,17 +134,14 @@ export default function EventDrawer({
 
   return (
     <>
-      {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-sm"
+        className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-md"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Right Drawer */}
-      <div className="fixed right-0 top-0 w-full max-w-md h-screen z-50 bg-paper shadow-2xl overflow-y-auto flex flex-col">
-        {/* Header */}
-        <div className="sticky top-0 bg-paper border-b border-ink border-2 p-4 flex items-center justify-between">
+      <div className="fixed right-0 top-0 w-full max-w-md h-screen z-50 bg-paper shadow-2xl overflow-y-auto flex flex-col border-l-2 border-ink ring-1 ring-ink/10">
+        <div className="sticky top-0 bg-paper border-b-2 border-ink p-4 flex items-center justify-between">
           <div className="flex-1 min-w-0">
             <div className="text-[11px] font-medium font-bold text-ink/60 uppercase tracking-wider mb-1">
               {isEditing ? 'Edit Event Type' : 'Create Event Type'}
@@ -167,10 +154,11 @@ export default function EventDrawer({
                 id="event-title"
                 type="text"
                 required
+                autoFocus
                 value={title}
                 onChange={(e) => handleTitleChange(e.target.value)}
                 placeholder="New meeting"
-                className={`w-full bg-transparent text-[18px] font-bold text-ink outline-none placeholder:text-clay/40 ${errors.title ? 'border-b border-oxblood border-2' : ''}`}
+                className={`w-full bg-transparent text-[18px] font-bold text-ink outline-none placeholder:text-clay/40 border-b-2 border-b-transparent focus:border-b-stamp focus:ring-0 ${errors.title ? 'border-b-oxblood' : ''}`}
                 aria-label="Meeting name"
               />
               {errors.title && (
@@ -188,38 +176,34 @@ export default function EventDrawer({
           </button>
         </div>
 
-        {/* Content */}
-        <form id="event-drawer-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-5">
-
-          {/* Slug field */}
-          <div className="border-b border-ink border-2 pb-4">
-            <div className="flex items-center gap-2 mb-2">
-              <label className="text-[12px] font-medium font-bold text-ink/70">URL Slug</label>
-              {errors.slug && (
-                <span className="text-[11px] font-medium text-oxblood">error</span>
-              )}
+        <form id="event-drawer-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* URL Slug */}
+          <section className="space-y-2 border-b-2 border-ink pb-4">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-medium font-bold text-ink/70 uppercase tracking-wider">URL Slug</label>
+              {errors.slug && <span className="text-[10px] font-medium text-oxblood">error</span>}
             </div>
             <div className="flex items-center rounded-sm border-2 border-ink bg-clay/5 overflow-hidden">
-              <span className="px-2.5 py-2 text-[12px] font-medium text-ink/50 border-r border-ink border-2 whitespace-nowrap">
-                /{'{'}username{'}'}/
+              <span className="px-2.5 py-2 text-[11px] font-medium text-ink/50 border-r border-ink border-2 whitespace-nowrap">
+                /{publicUsername()}/
               </span>
               <input
                 type="text"
                 value={slug}
                 onChange={(e) => handleSlugChange(e.target.value)}
                 placeholder="event-slug"
-                className="flex-1 bg-transparent px-2.5 py-2 text-[13px] font-medium text-ink/90 outline-none"
+                className="flex-1 bg-transparent px-2.5 py-2 text-[13px] font-medium text-ink/90 outline-none border-b-0"
                 aria-label="URL Slug"
               />
             </div>
-            <p className="mt-1 text-[11px] font-medium text-ink/50">
+            <p className="mt-1 text-[10px] font-medium text-ink/40">
               Public booking URL will be <code className="text-ink font-bold">/{slug}</code>
             </p>
-          </div>
+          </section>
 
           {/* Description */}
-          <div className="border-b border-ink border-2 pb-4">
-            <label className="block text-[12px] font-medium font-bold text-ink/70 mb-2">Description</label>
+          <section className="space-y-2 border-b-2 border-ink pb-4">
+            <label className="text-[11px] font-medium font-bold text-ink/70 uppercase tracking-wider">Description</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -227,12 +211,12 @@ export default function EventDrawer({
               rows={3}
               className="w-full rounded-sm border-2 border-ink bg-clay/5 px-3 py-2 text-[13px] font-medium text-ink/90 outline-none focus:border-stamp border-2 resize-none"
             />
-          </div>
+          </section>
 
-          {/* Duration Section */}
-          <div className="border-b border-ink border-2 pb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[12px] font-medium font-bold text-ink/70">Duration</span>
+          {/* Duration */}
+          <section className="space-y-2 border-b-2 border-ink pb-4">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-medium font-bold text-ink/70 uppercase tracking-wider">Duration</label>
               <span className="text-[11px] font-medium text-stamp">{duration} min</span>
             </div>
             <select
@@ -244,14 +228,14 @@ export default function EventDrawer({
                 <option key={d} value={d}>{d} min</option>
               ))}
             </select>
-            <p className="mt-1 text-[11px] font-medium text-ink/50">
+            <p className="mt-1 text-[10px] font-medium text-ink/40">
               Length of each booking slot
             </p>
-          </div>
+          </section>
 
-          {/* Location Section */}
-          <div className="border-b border-ink border-2 pb-4">
-            <label className="block text-[12px] font-medium font-bold text-ink/70 mb-2">Location (optional)</label>
+          {/* Location */}
+          <section className="space-y-2 border-b-2 border-ink pb-4">
+            <label className="text-[11px] font-medium font-bold text-ink/70 uppercase tracking-wider">Location (optional)</label>
             <input
               type="text"
               value={location}
@@ -259,61 +243,69 @@ export default function EventDrawer({
               placeholder={LOCATION_PLACEHOLDER}
               className="w-full rounded-sm border-2 border-ink bg-clay/5 px-3 py-2 text-[13px] font-medium text-ink/90 outline-none focus:border-stamp border-2"
             />
-            <p className="mt-1 text-[11px] font-medium text-ink/50">
+            <p className="mt-1 text-[10px] font-medium text-ink/40">
               Where the meeting will take place (Zoom link, room number, etc.)
             </p>
-          </div>
+          </section>
 
-          {/* Buffer Times Section */}
-          <div className="grid grid-cols-2 gap-3 border-b border-ink border-2 pb-4">
-            <div className="space-y-2">
-              <label className="text-[12px] font-medium font-bold text-ink/70">Buffer Before</label>
-              <input
-                type="number"
-                value={bufferBefore}
-                onChange={(e) => setBufferBefore(Number(e.target.value) || 0)}
-                min={0}
-                max={1440}
-                className="w-full rounded-sm border-2 border-ink bg-clay/5 px-3 py-2 text-[13px] font-medium text-ink/90 outline-none focus:border-stamp border-2"
-              />
-              <p className="text-[11px] font-medium text-ink/50">min before</p>
+          {/* Buffer Times */}
+          <section className="space-y-2 border-b-2 border-ink pb-4">
+            <label className="text-[11px] font-medium font-bold text-ink/70 uppercase tracking-wider">Buffer Times</label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-medium text-ink/60 uppercase tracking-wider">Buffer Before</label>
+                <input
+                  type="number"
+                  value={bufferBefore}
+                  onChange={(e) => setBufferBefore(Number(e.target.value) || 0)}
+                  min={0}
+                  max={1440}
+                  className="w-full rounded-sm border-2 border-ink bg-clay/5 px-3 py-2 text-[13px] font-medium text-ink/90 outline-none focus:border-stamp border-2"
+                />
+                <p className="text-[10px] font-medium text-ink/40">min before</p>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-medium text-ink/60 uppercase tracking-wider">Buffer After</label>
+                <input
+                  type="number"
+                  value={bufferAfter}
+                  onChange={(e) => setBufferAfter(Number(e.target.value) || 0)}
+                  min={0}
+                  max={1440}
+                  className="w-full rounded-sm border-2 border-ink bg-clay/5 px-3 py-2 text-[13px] font-medium text-ink/90 outline-none focus:border-stamp border-2"
+                />
+                <p className="text-[10px] font-medium text-ink/40">min after</p>
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-[12px] font-medium font-bold text-ink/70">Buffer After</label>
-              <input
-                type="number"
-                value={bufferAfter}
-                onChange={(e) => setBufferAfter(Number(e.target.value) || 0)}
-                min={0}
-                max={1440}
-                className="w-full rounded-sm border-2 border-ink bg-clay/5 px-3 py-2 text-[13px] font-medium text-ink/90 outline-none focus:border-stamp border-2"
-              />
-              <p className="text-[11px] font-medium text-ink/50">min after</p>
-            </div>
-          </div>
+          </section>
 
-          {/* Active toggle */}
-          <div className="border-b border-ink border-2 pb-4">
-            <div className="flex items-center justify-between">
-              <span className="text-[12px] font-medium font-bold text-ink/70">Active</span>
+          {/* Active */}
+          <section className="space-y-2 border-b-2 border-ink pb-4">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-medium font-bold text-ink/70 uppercase tracking-wider">Active</label>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${isActive ? 'bg-stamp/10 text-stamp' : 'bg-clay/5 text-clay'}`}>
+                {isActive ? 'Live' : 'Inactive'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
               <Switch
                 checked={isActive}
                 onCheckedChange={setIsActive}
                 aria-label="Toggle event active"
               />
             </div>
-            <p className="mt-1 text-[11px] font-medium text-ink/60">
+            <p className="mt-1 text-[10px] font-medium text-ink/40">
               {isActive ? 'Invitees can book this event' : 'Event is hidden from booking page'}
             </p>
-          </div>
+          </section>
 
           {/* Submit */}
-          <div className="pt-4">
+          <div className="pt-6">
             <Button
               type="submit"
               form="event-drawer-form"
               disabled={submitting}
-              className="w-full py-3 px-6 text-[13px] font-medium font-bold text-paper uppercase tracking-wider"
+              className="w-full py-3.5 px-6 text-[13px] font-medium font-bold text-paper uppercase tracking-wider"
             >
               {submitting ? 'Saving…' : isEditing ? 'Save changes' : 'Create event type'}
             </Button>
@@ -322,4 +314,11 @@ export default function EventDrawer({
       </div>
     </>
   );
+}
+
+function publicUsername(): string {
+  if (typeof window === 'undefined') return 'username';
+  const path = window.location.pathname;
+  const match = path.match(/^\/([^/]+)\/?$/);
+  return match ? match[1] : 'username';
 }

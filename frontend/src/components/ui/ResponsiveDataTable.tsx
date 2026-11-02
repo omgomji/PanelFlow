@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Button } from './Button';
 import { StatusBadge, StatusVariant } from './StatusBadge';
+import type { ReactNode } from 'react';
 
 export interface Column<T> {
   key: string;
@@ -76,7 +77,7 @@ function TableBody<T>({
             {columns.map((col) => {
               return (
                 <td key={col.key} className={`p-4 align-middle ${col.className || ''}`}>
-                  {col.render ? col.render(item, index) : String((item as any)[col.key] ?? '')}
+                  {col.render ? col.render(item, index) : String((item as Record<string, unknown>)[col.key] ?? '')}
                 </td>
               );
             })}
@@ -117,8 +118,8 @@ function CardLayout<T>({
 
         const primaryCol = columns.find(c => c.key === primaryKey);
         const statusCol = statusKey ? columns.find(c => c.key === statusKey) : null;
-        const primaryValue = primaryCol?.render ? primaryCol.render(item, index) : String((item as any)[primaryKey] ?? '');
-        const statusValue = statusCol?.render ? statusCol.render(item, index) : statusKey ? (item as any)[statusKey] : null;
+        const primaryValue = primaryCol?.render ? (primaryCol.render(item, index) as ReactNode) : String((item as Record<string, unknown>)[primaryKey] ?? '');
+        const statusValue = statusCol?.render ? (statusCol.render(item, index) as ReactNode) : statusKey ? ((item as Record<string, unknown>)[statusKey] as ReactNode) : null;
 
         return (
           <article
@@ -134,7 +135,7 @@ function CardLayout<T>({
               {secondaryKeys.map((sk) => {
                 const col = columns.find(c => c.key === sk);
                 if (!col) return null;
-                const value = col.render ? col.render(item, index) : String((item as any)[sk] ?? '');
+                const value = col.render ? (col.render(item, index) as ReactNode) : String((item as Record<string, unknown>)[sk] ?? '');
                 return (
                   <div key={sk} className="font-mono text-ink/70">
                     <span className="font-bold text-ink">{col.header}: </span>
@@ -145,7 +146,7 @@ function CardLayout<T>({
             </div>
 
             {statusValue && (
-              <div className="mt-3 pt-3 border-t border-clay/30">
+              <div className="mt-3 pt-3 border-t-2 border-clay/30">
                 {statusCol?.render ? (
                   statusCol.render(item, index)
                 ) : (
@@ -155,7 +156,7 @@ function CardLayout<T>({
             )}
 
             {actionKeys && actionKeys.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-clay/30 flex flex-wrap gap-2">
+              <div className="mt-3 pt-3 border-t-2 border-clay/30 flex flex-wrap gap-2">
                 {actionKeys.map((ak) => {
                   const col = columns.find(c => c.key === ak);
                   if (!col?.render) return null;

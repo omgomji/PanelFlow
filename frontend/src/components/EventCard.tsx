@@ -100,8 +100,8 @@ export default function EventCard({
   return (
     <Card
       className={`group relative overflow-visible ${
- selected ? 'border-2 border-stamp' : 'border-ink'
- }`}
+        selected ? 'border-2 border-stamp' : 'border-2 border-ink'
+      }`}
       onClick={() => onSelect?.(eventPayload)}
     >
       <div className={`absolute left-0 top-0 h-full w-2 ${active ? 'bg-stamp' : 'bg-clay'}`} aria-hidden="true" />

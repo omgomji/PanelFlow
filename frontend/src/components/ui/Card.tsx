@@ -3,7 +3,7 @@ import * as React from 'react';
 export function Card({ className = '', children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={`border border-ink bg-paper p-6 ${className}`}
+      className={`border-2 border-ink bg-paper p-6 ${className}`}
       {...props}
     >
       {children}
@@ -13,7 +13,7 @@ export function Card({ className = '', children, ...props }: React.HTMLAttribute
 
 export function CardHeader({ className = '', children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={`mb-4 border-b border-clay/40 pb-4 ${className}`} {...props}>
+    <div className={`mb-4 border-b-2 border-clay/40 pb-4 ${className}`} {...props}>
       {children}
     </div>
   );

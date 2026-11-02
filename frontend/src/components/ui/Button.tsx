@@ -12,16 +12,16 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     let variantStyles = '';
     switch (variant) {
       case 'primary':
-        variantStyles = 'bg-ink text-paper hover:bg-ink/90 border border-ink';
+        variantStyles = 'bg-ink text-paper hover:bg-ink/90 border-2 border-ink';
         break;
       case 'secondary':
-        variantStyles = 'bg-transparent text-ink border border-clay/40 hover:bg-clay/10';
+        variantStyles = 'bg-transparent text-ink border-2 border-clay/40 hover:bg-clay/10';
         break;
       case 'danger':
-        variantStyles = 'bg-oxblood text-paper hover:bg-oxblood/90 border border-oxblood';
+        variantStyles = 'bg-oxblood text-paper hover:bg-oxblood/90 border-2 border-oxblood';
         break;
       case 'ghost':
-        variantStyles = 'bg-transparent text-ink hover:bg-clay/10';
+        variantStyles = 'bg-transparent text-ink hover:bg-clay/10 border-2 border-transparent';
         break;
     }
 

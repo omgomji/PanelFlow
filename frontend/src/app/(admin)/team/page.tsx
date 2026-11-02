@@ -84,8 +84,8 @@ export default function TeamPage() {
           username: u.username ?? null,
           role: u.role,
           timezone: u.timezone,
-          tokenVersion: (u as any).tokenVersion,
-          createdAt: (u as any).createdAt ?? new Date().toISOString(),
+          tokenVersion: (u as { tokenVersion?: number }).tokenVersion,
+          createdAt: (u as { createdAt?: string }).createdAt ?? new Date().toISOString(),
         }))
       );
     } catch (err) {
@@ -116,10 +116,9 @@ export default function TeamPage() {
       setInviteOpen(false);
       await fetchData();
       showAlert('Invitation Sent', `${inviteEmail} has been invited successfully.`);
-    } catch (err: any) {
-      setInviteError(
-        err?.response?.data?.error || 'Failed to send invitation. Please try again.'
-      );
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to send invitation. Please try again.';
+      setInviteError(message);
     } finally {
       setInviting(false);
     }
@@ -130,8 +129,8 @@ export default function TeamPage() {
       await revokeInvitation(id);
       await fetchData();
       showAlert('Revoked', 'Invitation has been revoked.');
-    } catch (err: any) {
-      showAlert('Error', err?.response?.data?.error || 'Failed to revoke invitation.');
+    } catch (err: unknown) {
+      showAlert('Error', (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to revoke invitation.');
     }
   };
 
@@ -141,8 +140,8 @@ export default function TeamPage() {
       await fetchData();
       showAlert('Resent', `Invitation link copied. Expires ${new Date(result.expiresAt).toLocaleDateString()}.`);
       navigator.clipboard.writeText(result.inviteUrl);
-    } catch (err: any) {
-      showAlert('Error', err?.response?.data?.error || 'Failed to resend invitation.');
+    } catch (err: unknown) {
+      showAlert('Error', (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to resend invitation.');
     }
   };
 
@@ -201,13 +200,10 @@ export default function TeamPage() {
         buttonText="Dismiss"
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Team Members */}
-        <div className="lg:col-span-8">
-          <Card className="border-2">
-            <CardHeader>
-              <CardTitle>Team Members</CardTitle>
-            </CardHeader>
+      <Card className="border-2">
+        <CardHeader>
+          <CardTitle>Team Members</CardTitle>
+        </CardHeader>
             <CardContent>
               {loading ? (
                 <div className="flex justify-center py-16">
@@ -272,11 +268,8 @@ export default function TeamPage() {
               )}
             </CardContent>
           </Card>
-        </div>
 
-        {/* Pending Invitations */}
-        <div className="lg:col-span-4 space-y-6">
-          <Card className="border-2">
+          <Card className="border-2 mt-6">
             <CardHeader>
               <CardTitle>Pending Invitations</CardTitle>
             </CardHeader>
@@ -293,16 +286,16 @@ export default function TeamPage() {
                     const isExpired = expiresAt <= new Date() || Boolean(inv.usedAt);
                     const daysLeft = Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
                     return (
-                      <div key={inv.id} className="p-3 rounded-sm border border-clay/20 bg-paper/50">
-                        <div className="flex justify-between items-start mb-1">
-                          <div className="font-display text-sm font-bold text-ink">{inv.email}</div>
+                      <div key={inv.id} className="p-3 rounded-sm border border-clay/20 bg-paper/50 max-w-full">
+                        <div className="flex justify-between items-start gap-2 mb-1">
+                          <div className="min-w-0 truncate font-display text-sm font-bold text-ink">{inv.email}</div>
                           <StatusBadge
                             status={isExpired ? 'inactive' : 'pending'}
                             label={inv.role}
                           />
                         </div>
                         <div className="flex items-center gap-2 text-xs text-ink/60 font-mono mb-2">
-                          <span>
+                          <span className="truncate">
                             {isExpired
                               ? inv.usedAt
                                 ? 'Used'
@@ -311,12 +304,12 @@ export default function TeamPage() {
                           </span>
                           {inv.createdBy && (
                             <>
-                              <span className="text-clay/40">·</span>
-                              <span>by {inv.createdBy.name}</span>
+                              <span className="text-clay/40 truncate">·</span>
+                              <span className="truncate">by {inv.createdBy.name}</span>
                             </>
                           )}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -338,7 +331,6 @@ export default function TeamPage() {
                             variant="danger"
                             size="sm"
                             onClick={() => {
-                              // inline confirm handled via dialog state would go here
                               handleRevoke(inv.id);
                             }}
                           >
@@ -352,8 +344,6 @@ export default function TeamPage() {
               )}
             </CardContent>
           </Card>
-        </div>
-      </div>
 
       {inviteOpen && (
         <div

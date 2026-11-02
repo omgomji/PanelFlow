@@ -6,14 +6,13 @@ import type { EventType, EventTypePayload } from '@/types/event-types';
 import type { WorkloadRow } from '@/lib/api';
 import EventCard from '@/components/EventCard';
 import EventDrawer from '@/components/EventDrawer';
-import CreateMenuPopover from '@/components/ui/CreateMenuPopover';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { AlertDialog } from '@/components/ui/AlertDialog';
 import { Input } from '@/components/ui/Input';
-import { Tabs, TabsTrigger } from '@/components/ui/Tabs';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 
 type EventTypeUpsert = EventTypePayload;
@@ -24,14 +23,12 @@ export default function Dashboard() {
   const [eventDrawerOpen, setEventDrawerOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventType | null>(null);
   const [activeTab, setActiveTab] = useState('Event types');
-  const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEventIds, setSelectedEventIds] = useState<number[]>([]);
   const [bulkToggleMenuOpen, setBulkToggleMenuOpen] = useState(false);
 
   const [publicUsername, setPublicUsername] = useState<string | null>(null);
   const [workload, setWorkload] = useState<WorkloadRow[]>([]);
-  const createMenuRef = useRef<HTMLDivElement | null>(null);
   const bulkToggleRef = useRef<HTMLDivElement | null>(null);
   const { user } = useAuth();
 
@@ -53,40 +50,21 @@ export default function Dashboard() {
       fetchWorkload();
     }
 
-    const handleOpenCreate = () => {
-      setEditingEvent(null);
-      setEventDrawerOpen(true);
+    const handleOpenCreate = (event: Event) => {
+      const customEvent = event as CustomEvent<{ type: string }>;
+      const { type } = customEvent.detail ?? {};
+      if (type === 'event-type') {
+        setEditingEvent(null);
+        setEventDrawerOpen(true);
+      }
     };
 
-    window.addEventListener('open-create-event', handleOpenCreate);
+    window.addEventListener('open-create-event', handleOpenCreate as EventListener);
 
     return () => {
       window.removeEventListener('open-create-event', handleOpenCreate);
     };
   }, [user?.role]);
-
-  useEffect(() => {
-    if (!createMenuOpen) return;
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setCreateMenuOpen(false);
-    };
-
-    const onPointerDown = (e: MouseEvent | PointerEvent) => {
-      const target = e.target as Node | null;
-      if (!target) return;
-      if (createMenuRef.current && !createMenuRef.current.contains(target)) {
-        setCreateMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('keydown', onKeyDown);
-    document.addEventListener('pointerdown', onPointerDown);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.removeEventListener('pointerdown', onPointerDown);
-    };
-  }, [createMenuOpen]);
 
   useEffect(() => {
     if (!bulkToggleMenuOpen) return;
@@ -255,7 +233,6 @@ export default function Dashboard() {
   };
 
   const handleCreateEventType = () => {
-    setCreateMenuOpen(false);
     setActiveTab('Event types');
     setEditingEvent(null);
     setEventDrawerOpen(true);
@@ -302,40 +279,47 @@ export default function Dashboard() {
 
   return (
     <div className="pb-20">
-      {/* Header */}
-      <div className="mt-2 mb-6 flex flex-col gap-3 sm:mt-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="font-display text-[28px] font-bold text-ink">Scheduling</h1>
-
-        <div className="relative" ref={createMenuRef}>
+      <PageHeader
+        title="Scheduling"
+        description="Manage your event types and bookings."
+        action={
           <Button
-            type="button"
-            onClick={() => setCreateMenuOpen((v) => !v)}
-            aria-haspopup="menu"
-            aria-expanded={createMenuOpen}
+            variant="primary"
+            size="sm"
+            onClick={handleCreateEventType}
           >
-            <span className="material-symbols-outlined text-[18px] mr-2">add</span>
+            <span className="material-symbols-outlined text-[16px] mr-2">add</span>
             Create
-            <span className="material-symbols-outlined text-[18px] ml-2">keyboard_arrow_down</span>
           </Button>
+        }
+      />
 
-          {createMenuOpen && (
-            <div role="menu" aria-label="Create menu" className="absolute right-0 mt-2 z-50 border-2 border-ink bg-paper shadow-sm">
-              <CreateMenuPopover
-                onCreateEventType={handleCreateEventType}
-              />
-            </div>
-          )}
-        </div>
+      <AlertDialog
+        isOpen={alertInfo.isOpen}
+        title={alertInfo.title}
+        message={alertInfo.message}
+        onClose={closeAlert}
+      />
+
+      <div className="mb-6 border-b-2 border-ink">
+        <nav className="flex gap-1" role="tablist" aria-label="Scheduling tabs">
+          {tabs.map((tab) => (
+            <button
+              key={tab}
+              role="tab"
+              aria-selected={activeTab === tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-3 font-display text-sm font-bold border-b-2 transition-colors ${
+                activeTab === tab
+                  ? 'border-stamp text-stamp'
+                  : 'border-transparent text-ink/60 hover:text-ink'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </nav>
       </div>
-
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        {tabs.map((tab) => (
-          <TabsTrigger key={tab} value={tab} activeValue={activeTab} onActiveChange={setActiveTab}>
-            {tab}
-          </TabsTrigger>
-        ))}
-      </Tabs>
 
       {/* Search + (optional) filter */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">

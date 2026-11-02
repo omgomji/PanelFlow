@@ -58,9 +58,10 @@ export default function AskPanelFlowPage() {
       const response = await askPanelFlow(trimmed);
       setHistory((items) => [...items, { query: trimmed, response }]);
       setQuery('');
-    } catch (err: any) {
-      const message = err?.response?.data?.error || err?.message || 'PanelFlow AI could not answer right now.';
-      setError(message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'PanelFlow AI could not answer right now.';
+      const apiError = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setError(apiError || message || 'PanelFlow AI could not answer right now.');
     } finally {
       setLoading(false);
     }
@@ -90,11 +91,13 @@ export default function AskPanelFlowPage() {
           },
         };
       }));
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'The meeting could not be cancelled.';
+      const apiError = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
       setNotice({
         isOpen: true,
         title: 'Action failed',
-        message: err?.response?.data?.error || err?.message || 'The meeting could not be cancelled.',
+        message: apiError || message,
       });
     }
   };

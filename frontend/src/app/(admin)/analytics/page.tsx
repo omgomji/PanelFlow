@@ -157,6 +157,11 @@ export default function AnalyticsPage() {
     }
   };
 
+  const maxInterviews = useMemo(
+    () => Math.max(...workload.map((w) => w.interviewCount), 1),
+    [workload]
+  );
+
   if (authLoading || !user) return <LoadingState message="Loading analytics..." />;
   if (user.role !== 'ADMIN') {
     return (
@@ -167,11 +172,6 @@ export default function AnalyticsPage() {
       />
     );
   }
-
-  const maxInterviews = useMemo(
-    () => Math.max(...workload.map((w) => w.interviewCount), 1),
-    [workload]
-  );
 
   const posFilterLabel = positions.find((p) => String(p.id) === positionId)?.title || 'All positions';
 
@@ -434,7 +434,7 @@ export default function AnalyticsPage() {
           <div className="mb-4 flex items-center gap-2">
             <span className="material-symbols-outlined text-[14px] text-ink/50">info</span>
             <p className="text-sm text-ink/60 font-mono">
-              'Fully reviewed' means every interviewer on the booking has submitted feedback. Overdue bookings are past their date with incomplete feedback.
+              &apos;Fully reviewed&apos; means every interviewer on the booking has submitted feedback. Overdue bookings are past their date with incomplete feedback.
             </p>
           </div>
         </CardContent>

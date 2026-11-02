@@ -2,7 +2,7 @@ import * as React from 'react';
 
 export function DataTable({ className = '', children, ...props }: React.HTMLAttributes<HTMLTableElement>) {
   return (
-    <div className="w-full overflow-auto border-y border-ink">
+    <div className="w-full overflow-auto border-y-2 border-ink">
       <table className={`w-full text-left text-sm ${className}`} {...props}>
         {children}
       </table>

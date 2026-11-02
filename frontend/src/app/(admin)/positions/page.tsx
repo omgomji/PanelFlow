@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import EventDrawer from '@/components/EventDrawer';
+import PositionDrawer from '@/components/PositionDrawer';
 import { useToast } from '@/components/ui/Toast';
 
 export default function PositionsPage() {
@@ -35,6 +35,12 @@ export default function PositionsPage() {
       const { type } = customEvent.detail ?? {};
       if (type === 'position') {
         setPositionDrawerOpen(true);
+      } else if (type === 'panel') {
+        showToast({
+          title: 'Create a panel from a position',
+          message: 'Select a position from the list, then add panels inside it.',
+          type: 'info',
+        });
       }
     };
 
@@ -56,13 +62,8 @@ export default function PositionsPage() {
 
   const handleCreatePosition = async (data: {
     title: string;
-    slug: string;
-    duration: number;
     description: string;
     isActive: boolean;
-    location?: string;
-    bufferBefore?: number;
-    bufferAfter?: number;
   }) => {
     setCreatingPosition(true);
     try {
@@ -122,7 +123,7 @@ export default function PositionsPage() {
       />
 
       {/* Position Creation Drawer */}
-      <EventDrawer
+      <PositionDrawer
         isOpen={positionDrawerOpen}
         onClose={() => setPositionDrawerOpen(false)}
         onSave={handleCreatePosition}

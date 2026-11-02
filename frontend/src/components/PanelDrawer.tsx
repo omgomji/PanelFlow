@@ -5,8 +5,6 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Switch } from '@/components/ui/Switch';
-import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { useToast } from '@/components/ui/Toast';
 
 export interface PanelDrawerData {
@@ -73,13 +71,13 @@ export default function PanelDrawer({
   const handleTitleChange = (value: string) => {
     setTitle(value);
     if (!slugManuallyEdited) {
-      setSlug(value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''));
+      setSlug(value.toLowerCase().replace(/\\s+/g, '-').replace(/[^a-z0-9-]/g, ''));
     }
     setErrors((prev) => ({ ...prev, title: '' }));
   };
 
   const handleSlugChange = (value: string) => {
-    setSlug(value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''));
+    setSlug(value.toLowerCase().replace(/\\s+/g, '-').replace(/[^a-z0-9-]/g, ''));
     setSlugManuallyEdited(true);
     setErrors((prev) => ({ ...prev, slug: '' }));
   };
@@ -97,7 +95,7 @@ export default function PanelDrawer({
 
     setSubmitting(true);
     try {
-      const finalSlug = slug.trim() || title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      const finalSlug = slug.trim() || title.toLowerCase().replace(/\\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
       onSave({
         title: title.trim(),
@@ -114,10 +112,11 @@ export default function PanelDrawer({
       });
 
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Something went wrong. Please try again.';
       showToast({
         title: 'Failed to save',
-        message: err?.response?.data?.error || 'Something went wrong. Please try again.',
+        message,
         type: 'error',
       });
     } finally {
@@ -130,29 +129,30 @@ export default function PanelDrawer({
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-sm"
+        className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-md"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      <div className="fixed right-0 top-0 w-full max-w-md h-screen z-50 bg-paper shadow-2xl overflow-y-auto flex flex-col">
-        <div className="sticky top-0 bg-paper border-b border-ink border-2 p-4 flex items-center justify-between">
+      <div className="fixed right-0 top-0 w-full max-w-md h-screen z-50 bg-paper shadow-2xl overflow-y-auto flex flex-col border-l-2 border-ink ring-1 ring-ink/10">
+        <div className="sticky top-0 bg-paper border-b-2 border-ink p-4 flex items-center justify-between">
           <div className="flex-1 min-w-0">
             <div className="text-[11px] font-medium font-bold text-ink/60 uppercase tracking-wider mb-1">
               {isEditing ? 'Edit Panel' : 'Create Panel'}
             </div>
             <div className="flex items-center gap-2">
-              <div className="h-6 w-6 rounded-sm bg-pine/10 flex items-center justify-center text-pine shrink-0">
+              <div className="h-6 w-6 rounded-sm bg-sage/10 flex items-center justify-center text-sage shrink-0">
                 <span className="material-symbols-outlined text-[18px] font-display font-semibold tracking-wide">groups</span>
               </div>
               <input
                 id="panel-title"
                 type="text"
                 required
+                autoFocus
                 value={title}
                 onChange={(e) => handleTitleChange(e.target.value)}
                 placeholder="e.g. Technical Sync"
-                className={`w-full bg-transparent text-[18px] font-bold text-ink outline-none placeholder:text-clay/40 ${errors.title ? 'border-b border-oxblood border-2' : ''}`}
+                className={`w-full bg-transparent text-[18px] font-bold text-ink outline-none placeholder:text-clay/40 border-b-2 border-b-transparent focus:border-b-sage focus:ring-0 ${errors.title ? 'border-b-oxblood' : ''}`}
                 aria-label="Panel name"
               />
               {errors.title && (
@@ -170,17 +170,15 @@ export default function PanelDrawer({
           </button>
         </div>
 
-        <form id="panel-drawer-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-5">
-          {/* Slug field */}
-          <div className="border-b border-ink border-2 pb-4">
-            <div className="flex items-center gap-2 mb-2">
-              <label className="text-[12px] font-medium font-bold text-ink/70">URL Slug</label>
-              {errors.slug && (
-                <span className="text-[11px] font-medium text-oxblood">error</span>
-              )}
+        <form id="panel-drawer-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* URL Slug */}
+          <section className="space-y-2 border-b-2 border-ink pb-4">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-medium font-bold text-ink/70 uppercase tracking-wider">URL Slug</label>
+              {errors.slug && <span className="text-[10px] font-medium text-oxblood">error</span>}
             </div>
             <div className="flex items-center rounded-sm border-2 border-ink bg-clay/5 overflow-hidden">
-              <span className="px-2.5 py-2 text-[12px] font-medium text-ink/50 border-r border-ink border-2 whitespace-nowrap">
+              <span className="px-2.5 py-2 text-[11px] font-medium text-ink/50 border-r border-ink border-2 whitespace-nowrap">
                 /panel/
               </span>
               <input
@@ -188,20 +186,20 @@ export default function PanelDrawer({
                 value={slug}
                 onChange={(e) => handleSlugChange(e.target.value)}
                 placeholder="panel-slug"
-                className="flex-1 bg-transparent px-2.5 py-2 text-[13px] font-medium text-ink/90 outline-none"
+                className="flex-1 bg-transparent px-2.5 py-2 text-[13px] font-medium text-ink/90 outline-none border-b-0"
                 aria-label="Panel Slug"
               />
             </div>
-            <p className="mt-1 text-[11px] font-medium text-ink/50">
+            <p className="mt-1 text-[10px] font-medium text-ink/40">
               Public booking URL: <code className="text-ink font-bold">/panel/{slug}</code>
             </p>
-          </div>
+          </section>
 
           {/* Duration */}
-          <div className="border-b border-ink border-2 pb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[12px] font-medium font-bold text-ink/70">Duration</span>
-              <span className="text-[11px] font-medium text-stamp">{duration} min</span>
+          <section className="space-y-2 border-b-2 border-ink pb-4">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-medium font-bold text-ink/70 uppercase tracking-wider">Duration</label>
+              <span className="text-[11px] font-medium text-sage">{duration} min</span>
             </div>
             <select
               value={duration}
@@ -212,18 +210,16 @@ export default function PanelDrawer({
                 <option key={d} value={d}>{d} min</option>
               ))}
             </select>
-          </div>
+          </section>
 
           {/* Interviewers */}
-          <div className="border-b border-ink border-2 pb-4">
-            <div className="flex items-center justify-between mb-2">
+          <section className="space-y-2 border-b-2 border-ink pb-4">
+            <div className="flex items-center justify-between mb-1">
               <div>
-                <span className="text-[12px] font-medium font-bold text-ink/70">Interviewers</span>
-                {errors.interviewers && (
-                  <span className="ml-2 text-[11px] font-medium text-oxblood">error</span>
-                )}
+                <label className="text-[11px] font-medium font-bold text-ink/70 uppercase tracking-wider">Interviewers</label>
+                {errors.interviewers && <span className="ml-2 text-[10px] font-medium text-oxblood">error</span>}
               </div>
-              <span className="text-[11px] font-medium text-stamp">{selectedInterviewers.length} selected</span>
+              <span className="text-[11px] font-medium text-sage">{selectedInterviewers.length} selected</span>
             </div>
             {interviewers.length === 0 ? (
               <div className="rounded-sm border-2 border-dashed border-ink bg-clay/5 p-4 text-center">
@@ -234,11 +230,11 @@ export default function PanelDrawer({
                 </p>
               </div>
             ) : (
-              <div className="space-y-1 max-h-40 overflow-y-auto">
+              <div className="space-y-1 max-h-48 overflow-y-auto">
                 {interviewers.map((iv) => (
                   <label
                     key={iv.id}
-                    className="flex items-center gap-3 p-2.5 rounded-sm hover:bg-clay/5 cursor-pointer transition-colors"
+                    className="flex items-center gap-3 p-2 rounded-sm hover:bg-clay/5 cursor-pointer transition-colors"
                   >
                     <input
                       type="checkbox"
@@ -250,7 +246,7 @@ export default function PanelDrawer({
                       <div className="text-[13px] font-medium text-ink">{iv.name}</div>
                       <div className="text-[11px] text-ink/50">{iv.email}</div>
                     </div>
-                    <span className={`text-[11px] font-bold rounded-sm px-1.5 py-0.5 ${
+                    <span className={`text-[10px] font-bold rounded-sm px-1.5 py-0.5 ${
                       selectedInterviewers.includes(iv.id) ? 'bg-stamp text-paper' : 'bg-clay/5 text-ink/50'
                     }`}>
                       {selectedInterviewers.includes(iv.id) ? 'Added' : 'Add'}
@@ -264,29 +260,35 @@ export default function PanelDrawer({
                 Select at least one interviewer to accept bookings.
               </p>
             )}
-          </div>
+          </section>
 
-          {/* Active toggle */}
-          <div className="border-b border-ink border-2 pb-4">
-            <div className="flex items-center justify-between">
-              <span className="text-[12px] font-medium font-bold text-ink/70">Active</span>
+          {/* Active */}
+          <section className="space-y-2 border-b-2 border-ink pb-4">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-medium font-bold text-ink/70 uppercase tracking-wider">Active</label>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${isActive ? 'bg-sage/10 text-sage' : 'bg-clay/5 text-clay'}`}>
+                {isActive ? 'Live' : 'Inactive'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
               <Switch
                 checked={isActive}
                 onCheckedChange={setIsActive}
                 aria-label="Toggle panel active"
               />
             </div>
-            <p className="mt-1 text-[11px] font-medium text-ink/60">
+            <p className="mt-1 text-[10px] font-medium text-ink/40">
               {isActive ? 'Candidates can book this panel' : 'Panel is hidden from booking page'}
             </p>
-          </div>
+          </section>
 
-          <div className="pt-4">
+          {/* Submit */}
+          <div className="pt-6">
             <Button
               type="submit"
               form="panel-drawer-form"
               disabled={submitting}
-              className="w-full py-3 px-6 text-[13px] font-medium font-bold text-paper uppercase tracking-wider"
+              className="w-full py-3.5 px-6 text-[13px] font-medium font-bold text-paper uppercase tracking-wider"
             >
               {submitting ? 'Saving…' : isEditing ? 'Save changes' : 'Create panel'}
             </Button>

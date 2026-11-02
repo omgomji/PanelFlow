@@ -1,7 +1,7 @@
 /**
  * Next.js Edge Middleware — Route Protection
  *
- * Checks for the PRESENCE of the `token` cookie and redirects to /login
+ * Checks for the PRESENCE of the `accessToken` cookie and redirects to /login
  * if it is missing from protected admin routes.
  *
  * NOTE: This does NOT verify the JWT signature — Next.js Edge middleware
@@ -33,10 +33,10 @@ export default function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for the frontend-specific isLoggedIn cookie
-  const isLoggedIn = req.cookies.get('isLoggedIn');
+  // The backend auth cookie is httpOnly and is the single source of truth.
+  const accessToken = req.cookies.get('accessToken');
 
-  if (!isLoggedIn) {
+  if (!accessToken) {
     const loginUrl = new URL('/login', req.url);
     loginUrl.searchParams.set('from', pathname);
     return NextResponse.redirect(loginUrl);

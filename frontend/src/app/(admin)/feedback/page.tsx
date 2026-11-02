@@ -6,6 +6,12 @@ import type { MeetingRecord } from '@/types/booking';
 import type { Feedback, Recommendation } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import axios from 'axios';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Switch } from '@/components/ui/Switch';
+import { AlertDialog } from '@/components/ui/AlertDialog';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 
 export default function FeedbackPage() {
   const [meetings, setMeetings] = useState<MeetingRecord[]>([]);
@@ -43,14 +49,14 @@ export default function FeedbackPage() {
       setSelectedBooking(null);
       return;
     }
-    
+
     setSelectedBooking(bookingId);
     setLoadingFeedbacks(true);
     setFormError('');
     try {
       const fbs = await getBookingFeedback(bookingId);
       setFeedbacks(fbs);
-      
+
       const myFeedback = fbs.find(f => f.interviewerId === user?.id);
       if (myFeedback) {
         setRecommendation(myFeedback.recommendation);
@@ -69,23 +75,20 @@ export default function FeedbackPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBooking || !recommendation) return;
-    
+
     setFormError('');
     setSubmitting(true);
     try {
-      await submitFeedback(selectedBooking, { 
-        recommendation: recommendation as Recommendation, 
-        notes 
+      await submitFeedback(selectedBooking, {
+        recommendation: recommendation as Recommendation,
+        notes,
       });
       // Reload feedbacks to reveal others'
       const fbs = await getBookingFeedback(selectedBooking);
       setFeedbacks(fbs);
-    } catch (err) {
-      if (axios.isAxiosError(err)) {
-        setFormError((err.response?.data as { error?: string })?.error || 'Failed to submit feedback');
-      } else {
-        setFormError('Something went wrong');
-      }
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to submit feedback';
+      setFormError(message);
     } finally {
       setSubmitting(false);
     }
@@ -100,166 +103,191 @@ export default function FeedbackPage() {
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-ink mb-6">Meeting Feedback</h1>
-      
-      {!meetings.length ? (
-        <div className="rounded-sm border-2 border-dashed border-ink border-2 bg-clay/5 py-16 text-center">
-          <span className="material-symbols-outlined text-4xl text-clay/50 mb-2">rate_review</span>
-          <p className="font-medium text-ink/60">No past meetings found requiring feedback.</p>
-        </div>
+    <div className="pb-20">
+      <PageHeader
+        title="Meeting Feedback"
+        description="Submit and review interview feedback for past meetings."
+      />
+
+      <AlertDialog
+        isOpen={formError !== ''}
+        title="Feedback Error"
+        message={formError}
+        onClose={() => setFormError('')}
+        buttonText="Dismiss"
+      />
+
+      {meetings.length === 0 ? (
+        <Card className="border-2">
+          <CardHeader>
+            <CardTitle>Meeting Feedback</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-ink bg-paper">
+            <span className="material-symbols-outlined text-4xl text-clay/50 mb-2">rate_review</span>
+            <p className="font-medium text-ink/60">No past meetings found requiring feedback.</p>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="space-y-4">
-          {meetings.map((meeting) => {
-            const isSelected = selectedBooking === meeting.id;
-            return (
-              <div key={meeting.id} className="rounded-sm border-2 border-ink bg-paper overflow-hidden">
-                <div 
-                  className={`px-5 py-4 flex items-center justify-between cursor-pointer hover:bg-clay/5 transition-colors ${isSelected ? 'bg-clay/5 border-b border-ink border-2' : ''}`}
-                  onClick={() => handleSelectBooking(meeting.id)}
-                >
-                  <div>
-                    <h3 className="text-[14px] font-display font-semibold tracking-wide font-bold text-ink">
-                      {meeting.panel ? (
-                        <>
-                          <span className="text-ink/60 font-medium mr-1">{meeting.panel.position?.title} -</span>
-                          {meeting.panel.title}
-                        </>
-                      ) : (
-                        meeting.eventType?.title || 'Meeting'
-                      )}{' '}
-                      with {meeting.inviteeName}
-                    </h3>
-                    <div className="text-xs text-ink/60 mt-1 flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[14px] font-display font-semibold tracking-wide">event</span>
-                      {new Date(meeting.startTime).toLocaleString()}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {meeting.status === 'NO_SHOW' && (
-                      <span className="bg-orange-100 text-orange-700 text-[10px] font-bold px-2 py-0.5 rounded-sm uppercase tracking-wider">
-                        No Show
-                      </span>
-                    )}
-                    <span className="material-symbols-outlined text-ink/50">
-                      {isSelected ? 'expand_less' : 'expand_more'}
-                    </span>
-                  </div>
-                </div>
-
-                {isSelected && (
-                  <div className="p-5">
-                    {loadingFeedbacks ? (
-                      <div className="flex justify-center py-4">
-                        <div className="h-5 w-5 animate-spin rounded-sm border-b-2 border-stamp border-2" />
-                      </div>
-                    ) : (
-                      <div className="flex flex-col md:flex-row gap-6">
-                        {/* My Feedback Form */}
-                        <div className="flex-1">
-                          <h4 className="text-[14px] font-display font-semibold tracking-wide font-bold text-ink mb-3">Your Feedback</h4>
-                          
-                          {formError && (
-                            <div className="mb-4 rounded-sm bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
-                              {formError}
-                            </div>
-                          )}
-
-                          <form onSubmit={handleSubmit} className="space-y-4">
-                            <div>
-                              <label className="block text-xs font-bold text-ink mb-2">Recommendation</label>
-                              <div className="flex flex-wrap gap-2">
-                                {(
-                                  [
-                                    { val: 'STRONG_NO', label: 'Strong No', color: 'red' },
-                                    { val: 'NO', label: 'No', color: 'orange' },
-                                    { val: 'YES', label: 'Yes', color: 'emerald' },
-                                    { val: 'STRONG_YES', label: 'Strong Yes', color: 'green' }
-                                  ] as const
-                                ).map((opt) => (
-                                  <button
-                                    key={opt.val}
-                                    type="button"
-                                    onClick={() => setRecommendation(opt.val as Recommendation)}
-                                    className={`px-4 py-2 rounded-sm text-[14px] font-display font-semibold tracking-wide font-bold border transition-colors ${
-                                      recommendation === opt.val
-                                        ? ({
-                                            red: 'bg-oxblood/20 border-oxblood text-oxblood',
-                                            orange: 'bg-clay/20 border-clay text-ink',
-                                            emerald: 'bg-sage/20 border-sage text-sage',
-                                            green: 'bg-sage/20 border-sage text-sage',
-                                          }[opt.color])
-                                        : 'bg-paper border-ink border-2 text-ink/70 hover:bg-clay/5'
-                                    }`}
-                                  >
-                                    {opt.label}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                            
-                            <div>
-                              <label className="block text-xs font-bold text-ink mb-1.5">Notes (Optional)</label>
-                              <textarea
-                                value={notes}
-                                onChange={(e) => setNotes(e.target.value)}
-                                rows={3}
-                                className="w-full px-3 py-2 border-2 border-ink rounded-sm text-[14px] font-display font-semibold tracking-wide focus:outline-none focus:ring-2 focus:ring-stamp/30 focus:border-stamp border-2 resize-none"
-                                placeholder="Any additional thoughts?"
-                              />
-                            </div>
-
-                            <button
-                              type="submit"
-                              disabled={!recommendation || submitting}
-                              className="rounded-sm bg-stamp px-5 py-2 text-[14px] font-display font-semibold tracking-wide font-bold text-paper hover:bg-blue-700 disabled:opacity-50"
-                            >
-                              {submitting ? 'Submitting...' : 'Submit Feedback'}
-                            </button>
-                          </form>
-                        </div>
-
-                        {/* Co-panelists Feedback */}
-                        <div className="flex-1 md:border-l md:border-ink border-2 md:pl-6">
-                          <h4 className="text-[14px] font-display font-semibold tracking-wide font-bold text-ink mb-3">Panel Feedback</h4>
-                          
-                          {!feedbacks.some(f => f.interviewerId === user?.id) && user?.role !== 'ADMIN' ? (
-                            <div className="rounded-sm bg-clay/5 border-2 border-ink p-4 text-center">
-                              <span className="material-symbols-outlined text-clay/50 text-2xl mb-1">lock</span>
-                              <p className="text-xs font-medium text-ink/60">
-                                Submit your own feedback first to see how others voted.
-                              </p>
-                            </div>
+        <Card className="border-2">
+          <CardHeader>
+            <CardTitle>Meeting Feedback</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-4">
+              {meetings.map((meeting) => {
+                const isSelected = selectedBooking === meeting.id;
+                return (
+                  <div key={meeting.id} className="rounded-sm border-2 border-ink bg-paper overflow-hidden">
+                    <div
+                      className={`px-5 py-4 flex items-center justify-between cursor-pointer hover:bg-clay/5 transition-colors ${isSelected ? 'bg-clay/5 border-b border-ink border-2' : ''}`}
+                      onClick={() => handleSelectBooking(meeting.id)}
+                    >
+                      <div>
+                        <h3 className="text-[14px] font-display font-semibold tracking-wide font-bold text-ink">
+                          {meeting.panel ? (
+                            <>
+                              <span className="text-ink/60 font-medium mr-1">{meeting.panel.position?.title} -</span>
+                              {meeting.panel.title}
+                            </>
                           ) : (
-                            <div className="space-y-3">
-                              {feedbacks.length === 0 ? (
-                                <p className="text-xs text-ink/60 italic">No feedback submitted yet.</p>
-                              ) : (
-                                feedbacks.map(fb => (
-                                  <div key={fb.id} className="p-3 rounded-sm bg-clay/5 border-2 border-ink">
-                                    <div className="flex justify-between items-center mb-1">
-                                      <div className="text-[14px] font-display font-semibold tracking-wide font-bold text-ink">{fb.interviewer.name}</div>
-                                      <div className="text-[10px] font-bold px-2 py-0.5 rounded-sm uppercase tracking-wider bg-clay/20 text-ink/80">
-                                        {fb.recommendation.replace('_', ' ')}
-                                      </div>
-                                    </div>
-                                    {fb.notes && (
-                                      <p className="text-xs text-ink/70 mt-2">{fb.notes}</p>
-                                    )}
+                            meeting.eventType?.title || 'Meeting'
+                          )}{' '}
+                          with {meeting.inviteeName}
+                        </h3>
+                        <div className="text-xs text-ink/60 mt-1 flex items-center gap-2">
+                          <span className="material-symbols-outlined text-[14px] font-display font-semibold tracking-wide">event</span>
+                          {new Date(meeting.startTime).toLocaleString()}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {meeting.status === 'NO_SHOW' && (
+                          <span className="bg-orange-100 text-orange-700 text-[10px] font-bold px-2 py-0.5 rounded-sm uppercase tracking-wider">
+                            No Show
+                          </span>
+                        )}
+                        <span className="material-symbols-outlined text-ink/50">
+                          {isSelected ? 'expand_less' : 'expand_more'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {isSelected && (
+                      <div className="p-5">
+                        {loadingFeedbacks ? (
+                          <div className="flex justify-center py-4">
+                            <div className="h-5 w-5 animate-spin rounded-sm border-b-2 border-stamp border-2" />
+                          </div>
+                        ) : (
+                          <div className="flex flex-col md:flex-row gap-6">
+                            {/* My Feedback Form */}
+                            <div className="flex-1">
+                              <h4 className="text-[14px] font-display font-semibold tracking-wide font-bold text-ink mb-3">
+                                Your Feedback
+                              </h4>
+
+                              {formError && (
+                                <div className="mb-4 rounded-sm bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+                                  {formError}
+                                </div>
+                              )}
+
+                              <form onSubmit={handleSubmit} className="space-y-4">
+                                <div>
+                                  <label className="block text-xs font-bold text-ink mb-2">Recommendation</label>
+                                  <div className="flex flex-wrap gap-2">
+                                    {([
+                                      { val: 'STRONG_NO', label: 'Strong No', color: 'red' },
+                                      { val: 'NO', label: 'No', color: 'orange' },
+                                      { val: 'YES', label: 'Yes', color: 'emerald' },
+                                      { val: 'STRONG_YES', label: 'Strong Yes', color: 'green' }
+                                    ] as const).map((opt) => (
+                                      <button
+                                        key={opt.val}
+                                        type="button"
+                                        onClick={() => setRecommendation(opt.val as Recommendation)}
+                                        className={`px-4 py-2 rounded-sm text-[14px] font-display font-semibold tracking-wide font-bold border transition-colors ${
+                                          recommendation === opt.val
+                                            ? ({
+                                                red: 'bg-oxblood/20 border-oxblood text-oxblood',
+                                                orange: 'bg-clay/20 border-clay text-ink',
+                                                emerald: 'bg-sage/20 border-sage text-sage',
+                                                green: 'bg-sage/20 border-sage text-sage',
+                                              }[opt.color])
+                                            : 'bg-paper border-ink border-2 text-ink/70 hover:bg-clay/5'
+                                        }`}
+                                      >
+                                        {opt.label}
+                                      </button>
+                                    ))}
                                   </div>
-                                ))
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-bold text-ink mb-1.5">Notes (Optional)</label>
+                                  <textarea
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                    rows={3}
+                                    className="w-full px-3 py-2 border-2 border-ink rounded-sm text-[14px] font-display font-semibold tracking-wide focus:outline-none focus:ring-2 focus:ring-stamp/30 focus:border-stamp border-2 resize-none"
+                                    placeholder="Any additional thoughts?"
+                                  />
+                                </div>
+
+                                <button
+                                  type="submit"
+                                  disabled={!recommendation || submitting}
+                                  className="rounded-sm bg-stamp px-5 py-2 text-[14px] font-display font-semibold tracking-wide font-bold text-paper hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                  {submitting ? 'Submitting...' : 'Submit Feedback'}
+                                </button>
+                              </form>
+                            </div>
+
+                            {/* Co-panelists Feedback */}
+                            <div className="flex-1 md:border-l md:border-ink border-2 md:pl-6">
+                              <h4 className="text-[14px] font-display font-semibold tracking-wide font-bold text-ink mb-3">
+                                Panel Feedback
+                              </h4>
+
+                              {!feedbacks.some(f => f.interviewerId === user?.id) && user?.role !== 'ADMIN' ? (
+                                <div className="rounded-sm bg-clay/5 border-2 border-ink p-4 text-center">
+                                  <span className="material-symbols-outlined text-clay/50 text-2xl mb-1">lock</span>
+                                  <p className="text-xs font-medium text-ink/60">
+                                    Submit your own feedback first to see how others voted.
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="space-y-3">
+                                  {feedbacks.length === 0 ? (
+                                    <p className="text-xs text-ink/60 italic">No feedback submitted yet.</p>
+                                  ) : (
+                                    feedbacks.map(fb => (
+                                      <div key={fb.id} className="p-3 rounded-sm bg-clay/5 border-2 border-ink">
+                                        <div className="flex justify-between items-center mb-1">
+                                          <div className="text-[14px] font-display font-semibold tracking-wide font-bold text-ink">{fb.interviewer.name}</div>
+                                          <div className="text-[10px] font-bold px-2 py-0.5 rounded-sm uppercase tracking-wider bg-clay/20 text-ink/80">
+                                            {fb.recommendation.replace('_', ' ')}
+                                          </div>
+                                        </div>
+                                        {fb.notes && (
+                                          <p className="text-xs text-ink/70 mt-2">{fb.notes}</p>
+                                        )}
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
                               )}
                             </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

@@ -22,17 +22,17 @@ export interface StatusBadgeProps extends React.HTMLAttributes<HTMLSpanElement> 
 }
 
 const statusStyles: Record<StatusVariant, string> = {
-  active: 'bg-sage/10 text-sage border-sage/20',
-  inactive: 'bg-ink/10 text-ink/60 border-ink/20',
-  pending: 'bg-amber/10 text-amber border-amber/20',
-  scheduled: 'bg-blue/10 text-blue border-blue/20',
-  completed: 'bg-sage/10 text-sage border-sage/20',
-  cancelled: 'bg-oxblood/10 text-oxblood border-oxblood/20',
-  'no-show': 'bg-orange/10 text-orange border-orange/20',
-  open: 'bg-sage/10 text-sage border-sage/20',
-  closed: 'bg-ink/10 text-ink/60 border-ink/20',
-  draft: 'bg-clay/10 text-ink/60 border-clay/20',
-  published: 'bg-pine/10 text-pine border-pine/20',
+  active: 'border-2 border-sage/20 bg-sage/10 text-sage',
+  inactive: 'border-2 border-ink/20 bg-ink/10 text-ink/60',
+  pending: 'border-2 border-amber/20 bg-amber/10 text-amber',
+  scheduled: 'border-2 border-blue/20 bg-blue/10 text-blue',
+  completed: 'border-2 border-sage/20 bg-sage/10 text-sage',
+  cancelled: 'border-2 border-oxblood/20 bg-oxblood/10 text-oxblood',
+  'no-show': 'border-2 border-orange/20 bg-orange/10 text-orange',
+  open: 'border-2 border-sage/20 bg-sage/10 text-sage',
+  closed: 'border-2 border-ink/20 bg-ink/10 text-ink/60',
+  draft: 'border-2 border-clay/20 bg-clay/10 text-ink/60',
+  published: 'border-2 border-pine/20 bg-pine/10 text-pine',
 };
 
 const statusLabels: Record<StatusVariant, string> = {

@@ -44,13 +44,8 @@ function LoginForm() {
   });
 
   useEffect(() => {
-    if (!loading && user) {
+    if (!loading && user && window.location.pathname !== from) {
       router.replace(from);
-      setTimeout(() => {
-        if (window.location.pathname === '/login') {
-          window.location.href = from;
-        }
-      }, 100);
     }
   }, [user, loading, from, router]);
 
@@ -93,7 +88,12 @@ function LoginForm() {
             <CardTitle className="text-center text-xl uppercase tracking-widest text-ink">Authentication</CardTitle>
           </CardHeader>
 
-          <CardContent>
+          <CardContent className="space-y-6">
+            <div className="p-3 rounded-sm border-2 border-clay/20 bg-clay/5 text-center">
+              <p className="text-xs font-medium text-ink/60 font-mono">
+                Backend may take ~15s to wake up on first load. Please wait if login is slow.
+              </p>
+            </div>
             {error && (
               <div className="mb-6 border border-oxblood bg-oxblood/10 px-4 py-3 font-mono text-xs text-oxblood">
                 {error}
@@ -195,4 +195,3 @@ export default function LoginPage() {
     </Suspense>
   );
 }
-

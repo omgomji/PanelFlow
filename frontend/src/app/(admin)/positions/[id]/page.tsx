@@ -96,20 +96,13 @@ export default function PositionDetailPage() {
         message: `${data.title} is ready to accept bookings.`,
         type: 'success',
       });
-    } catch (err) {
-      if (axios.isAxiosError(err)) {
-        showToast({
-          title: 'Failed to create panel',
-          message: err?.response?.data?.error || 'Something went wrong.',
-          type: 'error',
-        });
-      } else {
-        showToast({
-          title: 'Failed to create panel',
-          message: 'Something went wrong.',
-          type: 'error',
-        });
-      }
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Something went wrong.';
+      showToast({
+        title: 'Failed to update panel',
+        message,
+        type: 'error',
+      });
     } finally {
       setCreatingPanel(false);
     }
@@ -139,7 +132,7 @@ export default function PositionDetailPage() {
         message: `${data.title} has been updated.`,
         type: 'success',
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         showToast({
           title: 'Failed to update panel',
@@ -194,7 +187,7 @@ type PanelEditorInput = {
         message: `${deleteConfirmPanelTitle} is no longer accepting bookings.`,
         type: 'success',
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         showToast({
           title: 'Failed to archive panel',

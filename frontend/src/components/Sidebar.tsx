@@ -83,7 +83,7 @@ export default function Sidebar({
   const openEventTypeCreate = () => {
     setCreateMenuOpen(false);
     onCloseMobile();
-    router.push('/positions');
+    router.push('/');
     window.dispatchEvent(new CustomEvent('open-create-event', { detail: { type: 'event-type' } }));
   };
 

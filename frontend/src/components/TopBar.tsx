@@ -83,7 +83,7 @@ export default function TopBar({ sidebarWidth, onMobileMenuToggle }: TopBarProps
               className="inline-flex h-9 w-9 items-center justify-center text-ink/70 transition-colors hover:bg-clay/10 hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-stamp rounded-sm"
               aria-label="Toggle dark mode"
             >
-              <span className="material-symbols-outlined text-[20px]">
+              <span className="material-symbols-outlined text-[20px]" suppressHydrationWarning>
                 {theme === 'dark' || (theme === 'system' && systemTheme === 'dark') ? 'light_mode' : 'dark_mode'}
               </span>
             </button>

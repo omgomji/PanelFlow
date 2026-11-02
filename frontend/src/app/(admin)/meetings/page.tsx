@@ -27,6 +27,7 @@ import { DataTable, DataTableHeader, DataTableBody, DataTableRow, DataTableHead,
 import { StampChip } from '@/components/ui/StampChip';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 export default function MeetingsPage() {
   const [meetings, setMeetings] = useState<MeetingRecord[]>([]);
@@ -71,7 +72,6 @@ export default function MeetingsPage() {
 
   useEffect(() => {
     fetchMeetings(activeTab, page, appliedRange);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
   useEffect(() => {
@@ -95,7 +95,7 @@ export default function MeetingsPage() {
       setLoading(true);
       const tab = currentTab;
       const statusParam = tab === 'Upcoming' ? 'upcoming' : tab === 'Past' ? 'past' : undefined;
-      
+
       let from, to;
       if (tab === 'Date Range') {
         from = range.start?.toISOString();
@@ -274,75 +274,64 @@ export default function MeetingsPage() {
   const displayEnd = Math.min(page * 10, totalCount);
 
   return (
-    <div className="pb-20 pt-4">
-      <div className="mb-4 flex items-center gap-2">
-        <h1 className="font-display text-[28px] font-bold text-ink">Meetings ({totalCount})</h1>
+    <div className="pb-20">
+      <PageHeader
+        title="Meetings"
+        description={`Manage your scheduled interviews. ${totalCount} event${totalCount !== 1 ? 's' : ''} total.`}
+      />
+
+      <AlertDialog
+        isOpen={alertInfo.isOpen}
+        title={alertInfo.title}
+        message={alertInfo.message}
+        onClose={closeAlert}
+      />
+
+      <div className="mb-6 border-b-2 border-ink">
+        <nav className="flex gap-1" role="tablist" aria-label="Meeting tabs">
+          {(['Upcoming', 'Past', 'Date Range'] as const).map((tab) => (
+            <button
+              key={tab}
+              role="tab"
+              aria-selected={activeTab === tab}
+              onClick={() => {
+                setActiveTab(tab);
+                setShowDateRangePicker(false);
+                setPage(1);
+                void fetchMeetings(tab, 1, appliedRange);
+              }}
+              className={`px-4 py-3 font-display text-sm font-bold border-b-2 transition-colors ${
+                activeTab === tab
+                  ? 'border-stamp text-stamp'
+                  : 'border-transparent text-ink/60 hover:text-ink'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </nav>
       </div>
 
-
-      <div className="relative border-2 border-ink bg-paper shadow-sm" ref={dateRangeRef}>
-        <div className="flex flex-col gap-3 border-b-2 border-ink px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-6 overflow-x-auto pb-1">
-            {tabs.map((tab) => {
-              if (tab === 'Date Range') {
-                return (
+      {activeTab === 'Date Range' && (
+        <Card className="border-2">
+          <CardHeader>
+            <CardTitle>Date Range Picker</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex flex-col gap-3 border-b-2 border-ink px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-6 overflow-x-auto pb-1">
+                {(['Today', 'This week', 'This month', 'All time'] as const).map((preset) => (
                   <button
-                    key={tab}
+                    key={preset}
                     type="button"
-                    onClick={openDateRangePicker}
-                    className={`relative inline-flex items-center gap-1 font-display text-sm font-bold uppercase tracking-wider ${
- activeTab === tab ? 'text-ink' : 'text-ink/60 hover:text-ink'
- }`}
+                    onClick={() => handlePresetSelect(preset)}
+                    className={`${selectedPreset === preset ? 'text-stamp' : 'text-ink/60 hover:text-ink'}`}
                   >
-                    {tab}
-                    <span className="material-symbols-outlined text-[16px]">
-                      {showDateRangePicker ? 'keyboard_arrow_up' : 'keyboard_arrow_down'}
-                    </span>
-                    {activeTab === tab && <span className="absolute -bottom-[14px] left-0 right-0 h-[2px] bg-ink" />}
+                    {preset}
                   </button>
-                );
-              }
-
-              return (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => {
-                    setActiveTab(tab);
-                    setShowDateRangePicker(false);
-                    setPage(1);
-                    void fetchMeetings(tab, 1, appliedRange);
-                  }}
-                  className={`relative font-display text-sm font-bold uppercase tracking-wider ${
- activeTab === tab ? 'text-ink' : 'text-ink/60 hover:text-ink'
- }`}
-                >
-                  {tab}
-                  {activeTab === tab && <span className="absolute -bottom-[14px] left-0 right-0 h-[2px] bg-ink" />}
-                </button>
-              );
-            })}
-          </div>
-
-
-        </div>
-
-        {showDateRangePicker && (
-          <div className="border-b-2 border-ink bg-clay/5 p-6">
-            <div className="border-2 border-ink bg-paper p-6">
-            <div className="mb-4 flex items-center gap-5 overflow-x-auto border-b-2 border-clay/30 pb-3 font-display text-[12px] font-bold uppercase tracking-wider text-stamp whitespace-nowrap">
-              {(['Today', 'This week', 'This month', 'All time'] as const).map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => handlePresetSelect(preset)}
-                  className={`${selectedPreset === preset ? 'text-stamp' : 'text-ink/60 hover:text-ink'}`}
-                >
-                  {preset}
-                </button>
-              ))}
+                ))}
+              </div>
             </div>
-
             <div className="flex items-start justify-between gap-2 sm:gap-4">
               <button
                 type="button"
@@ -384,12 +373,12 @@ export default function MeetingsPage() {
                               type="button"
                               onClick={() => handleDateSelection(startOfDay(date))}
                               className={`mx-auto inline-flex h-8 w-8 items-center justify-center text-[12px] font-bold leading-none sm:h-9 sm:w-9 ${
- isStart || isEnd
- ? 'bg-stamp text-paper'
- : inRange
- ? 'bg-stamp/10 text-stamp'
- : 'text-ink hover:bg-clay/20'
- } ${isSingle ? 'ring-0' : ''}`}
+                                isStart || isEnd
+                                  ? 'bg-stamp text-paper'
+                                  : inRange
+                                  ? 'bg-stamp/10 text-stamp'
+                                  : 'text-ink hover:bg-clay/20'
+                              } ${isSingle ? 'ring-0' : ''}`}
                             >
                               {format(date, 'd')}
                             </button>
@@ -409,229 +398,231 @@ export default function MeetingsPage() {
               >
                 <span className="material-symbols-outlined text-[18px]">chevron_right</span>
               </button>
-            </div>
 
             <div className="mt-8 flex items-center justify-center gap-6">
               <Button variant="ghost" onClick={cancelDateRange}>
                 CANCEL
               </Button>
-              <Button onClick={applyDateRange}>
-                APPLY
-              </Button>
-            </div>
+              <Button onClick={applyDateRange}>APPLY</Button>
             </div>
           </div>
-        )}
+          </CardContent>
+        </Card>
+      )}
 
-        <div className="flex items-center justify-end px-4 py-2 font-mono text-[10px] uppercase tracking-wider text-ink/70 bg-paper border-b-2 border-ink">
-          DISPLAYING {displayStart} - {displayEnd} OF {totalCount} EVENTS
-        </div>
+      <Card className="border-2">
+        <CardHeader>
+          <CardTitle>Meetings</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-end px-4 py-2 font-mono text-[10px] uppercase tracking-wider text-ink/70 border-b-2 border-ink bg-clay/5">
+            DISPLAYING {displayStart} - {displayEnd} OF {totalCount} EVENTS
+          </div>
 
-        <div className="min-h-[310px] bg-paper">
-          {loading ? (
-            <div className="flex h-[260px] items-center justify-center">
-              <div className="h-7 w-7 animate-spin rounded-full border-b-2 border-stamp" />
-            </div>
-          ) : totalCount > 0 ? (
-            <>
-              {isMobile ? (
-                <div className="space-y-3" role="list" aria-label="Meetings">
-                  {filteredMeetings.map((meeting) => {
-                    const isCancelled = meeting.status === 'CANCELLED';
-                    const isNoShow = meeting.status === 'NO_SHOW';
-                    const isUpcoming = new Date(meeting.startTime).getTime() >= Date.now();
-                    const canCancel = isUpcoming && !isCancelled && !isNoShow;
-                    const canMarkNoShow = !isUpcoming && !isCancelled && !isNoShow;
+          <div className="min-h-[310px] bg-paper">
+            {loading ? (
+              <div className="flex h-[260px] items-center justify-center">
+                <div className="h-7 w-7 animate-spin rounded-full border-b-2 border-stamp" />
+              </div>
+            ) : totalCount > 0 ? (
+              <>
+                {isMobile ? (
+                  <div className="space-y-3" role="list" aria-label="Meetings">
+                    {filteredMeetings.map((meeting) => {
+                      const isCancelled = meeting.status === 'CANCELLED';
+                      const isNoShow = meeting.status === 'NO_SHOW';
+                      const isUpcoming = new Date(meeting.startTime).getTime() >= Date.now();
+                      const canCancel = isUpcoming && !isCancelled && !isNoShow;
+                      const canMarkNoShow = !isUpcoming && !isCancelled && !isNoShow;
 
-                    return (
-                      <article
-                        key={meeting.id}
-                        className="border-2 border-ink bg-paper p-4 rounded-sm"
-                        role="listitem"
-                      >
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
-                          <div className="flex-1">
-                            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-ink/45">
-                              {new Date(meeting.startTime).toLocaleDateString(undefined, {
-                                weekday: 'short',
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric',
+                      return (
+                        <article
+                          key={meeting.id}
+                          className="border-2 border-ink bg-paper p-4 rounded-sm"
+                          role="listitem"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
+                            <div className="flex-1">
+                              <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-ink/45">
+                                {new Date(meeting.startTime).toLocaleDateString(undefined, {
+                                  weekday: 'short',
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })}
+                              </p>
+                              <h4 className="font-display text-base font-bold text-ink mt-1">
+                                {meeting.inviteeName || 'Invitee'}
+                              </h4>
+                              <p className="text-sm text-ink/70 font-mono mt-1">
+                                {meeting.eventType?.title || 'Meeting'}
+                              </p>
+                            </div>
+                            <div className="flex items-end gap-2">
+                              <StatusBadge
+                                status={isCancelled ? 'cancelled' : isNoShow ? 'no-show' : 'active'}
+                                label={isCancelled ? 'Cancelled' : isNoShow ? 'No Show' : 'Scheduled'}
+                              />
+                            </div>
+                          </div>
+                          <div className="border-t border-clay/30 pt-3 flex items-center justify-between gap-3">
+                            <p className="text-xs font-mono text-ink/60">
+                              {new Date(meeting.startTime).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
                               })}
                             </p>
-                            <h4 className="font-display text-base font-bold text-ink mt-1">
-                              {meeting.inviteeName || 'Invitee'}
-                            </h4>
-                            <p className="text-sm text-ink/70 font-mono mt-1">
-                              {meeting.eventType?.title || 'Meeting'}
+                            <div className="flex items-center gap-2">
+                              {canCancel && meeting.uid && (
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => window.open(`/reschedule/${meeting.uid}`, '_blank')}
+                                >
+                                  RESCHEDULE
+                                </Button>
+                              )}
+                              {canCancel && (
+                                <Button
+                                  variant="danger"
+                                  size="sm"
+                                  onClick={() => handleCancelMeetingClick(meeting.id)}
+                                  disabled={cancellingId === meeting.id}
+                                >
+                                  {cancellingId === meeting.id ? 'CANCELLING...' : 'CANCEL'}
+                                </Button>
+                              )}
+                              {canMarkNoShow && (
+                                <Button
+                                  variant="danger"
+                                  size="sm"
+                                  onClick={() => handleMarkNoShowClick(meeting.id)}
+                                  disabled={markingNoShowId === meeting.id}
+                                >
+                                  {markingNoShowId === meeting.id ? 'MARKING...' : 'MARK NO-SHOW'}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                          {isCancelled && meeting.cancellationReason && (
+                            <p className="mt-3 text-xs text-ink/60 font-mono">
+                              <span className="font-bold text-ink">Reason:</span> {meeting.cancellationReason}
                             </p>
-                          </div>
-                          <div className="flex items-end gap-2">
-                            <StatusBadge
-                              status={isCancelled ? 'cancelled' : isNoShow ? 'no-show' : 'active'}
-                              label={isCancelled ? 'Cancelled' : isNoShow ? 'No Show' : 'Scheduled'}
-                            />
-                          </div>
-                        </div>
-                        <div className="border-t border-clay/30 pt-3 flex items-center justify-between gap-3">
-                          <p className="text-xs font-mono text-ink/60">
-                            {new Date(meeting.startTime).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </p>
-                          <div className="flex items-center gap-2">
-                            {canCancel && meeting.uid && (
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => window.open(`/reschedule/${meeting.uid}`, '_blank')}
-                              >
-                                RESCHEDULE
-                              </Button>
-                            )}
-                            {canCancel && (
-                              <Button
-                                variant="danger"
-                                size="sm"
-                                onClick={() => handleCancelMeetingClick(meeting.id)}
-                                disabled={cancellingId === meeting.id}
-                              >
-                                {cancellingId === meeting.id ? 'CANCELLING...' : 'CANCEL'}
-                              </Button>
-                            )}
-                            {canMarkNoShow && (
-                              <Button
-                                variant="danger"
-                                size="sm"
-                                onClick={() => handleMarkNoShowClick(meeting.id)}
-                                disabled={markingNoShowId === meeting.id}
-                              >
-                                {markingNoShowId === meeting.id ? 'MARKING...' : 'MARK NO-SHOW'}
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                        {isCancelled && meeting.cancellationReason && (
-                          <p className="mt-3 text-xs text-ink/60 font-mono">
-                            <span className="font-bold text-ink">Reason:</span> {meeting.cancellationReason}
-                          </p>
-                        )}
-                      </article>
-                    );
-                  })}
-                </div>
-              ) : (
-                <DataTable>
-              <DataTableHeader>
-                <DataTableRow>
-                  <DataTableHead>Date & Time</DataTableHead>
-                  <DataTableHead>Invitee</DataTableHead>
-                  <DataTableHead>Event Type</DataTableHead>
-                  <DataTableHead>Status</DataTableHead>
-                  <DataTableHead className="text-right">Actions</DataTableHead>
-                </DataTableRow>
-              </DataTableHeader>
-              <DataTableBody>
-                {filteredMeetings.map((meeting) => {
-                  const isCancelled = meeting.status === 'CANCELLED';
-                  const isNoShow = meeting.status === 'NO_SHOW';
-                  const isUpcoming = new Date(meeting.startTime).getTime() >= Date.now();
-                  const canCancel = isUpcoming && !isCancelled && !isNoShow;
-                  const canMarkNoShow = !isUpcoming && !isCancelled && !isNoShow;
-
-                  return (
-                    <DataTableRow key={meeting.id}>
-                      <DataTableCell className="font-mono">
-                        {new Date(meeting.startTime).toLocaleString()}
-                      </DataTableCell>
-                      <DataTableCell className="font-bold">
-                        {meeting.inviteeName || 'Invitee'}
-                      </DataTableCell>
-                      <DataTableCell>
-                        {meeting.eventType?.title || 'Meeting'}
-                      </DataTableCell>
-                      <DataTableCell>
-                        {isCancelled ? (
-                          <div className="flex flex-col gap-1">
-                            <StampChip status="STRONG_NO" />
-                            {meeting.cancellationReason && (
-                              <span className="text-[10px] text-ink/60">Reason: {meeting.cancellationReason}</span>
-                            )}
-                          </div>
-                        ) : isNoShow ? (
-                          <StampChip status="NO" />
-                        ) : (
-                          <StampChip status="CONFIRMED" />
-                        )}
-                      </DataTableCell>
-                      <DataTableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {canCancel && meeting.uid && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => window.open(`/reschedule/${meeting.uid}`, '_blank')}
-                            >
-                              RESCHEDULE
-                            </Button>
                           )}
-                          
-                          {canCancel && (
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              onClick={() => handleCancelMeetingClick(meeting.id)}
-                              disabled={cancellingId === meeting.id}
-                            >
-                              {cancellingId === meeting.id ? 'CANCELLING...' : 'CANCEL'}
-                            </Button>
-                          )}
-                          
-                          {canMarkNoShow && (
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              onClick={() => handleMarkNoShowClick(meeting.id)}
-                              disabled={markingNoShowId === meeting.id}
-                            >
-                              {markingNoShowId === meeting.id ? 'MARKING...' : 'MARK NO-SHOW'}
-                            </Button>
-                          )}
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <DataTable>
+                    <DataTableHeader>
+                      <DataTableRow>
+                        <DataTableHead>Date & Time</DataTableHead>
+                        <DataTableHead>Invitee</DataTableHead>
+                        <DataTableHead>Event Type</DataTableHead>
+                        <DataTableHead>Status</DataTableHead>
+                        <DataTableHead className="text-right">Actions</DataTableHead>
+                      </DataTableRow>
+                    </DataTableHeader>
+                    <DataTableBody>
+                      {filteredMeetings.map((meeting) => {
+                        const isCancelled = meeting.status === 'CANCELLED';
+                        const isNoShow = meeting.status === 'NO_SHOW';
+                        const isUpcoming = new Date(meeting.startTime).getTime() >= Date.now();
+                        const canCancel = isUpcoming && !isCancelled && !isNoShow;
+                        const canMarkNoShow = !isUpcoming && !isCancelled && !isNoShow;
 
+                        return (
+                          <DataTableRow key={meeting.id}>
+                            <DataTableCell className="font-mono">
+                              {new Date(meeting.startTime).toLocaleString()}
+                            </DataTableCell>
+                            <DataTableCell className="font-bold">
+                              {meeting.inviteeName || 'Invitee'}
+                            </DataTableCell>
+                            <DataTableCell>
+                              {meeting.eventType?.title || 'Meeting'}
+                            </DataTableCell>
+                            <DataTableCell>
+                              {isCancelled ? (
+                                <div className="flex flex-col gap-1">
+                                  <StampChip status="STRONG_NO" />
+                                  {meeting.cancellationReason && (
+                                    <span className="text-[10px] text-ink/60">
+                                      Reason: {meeting.cancellationReason}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : isNoShow ? (
+                                <StampChip status="NO" />
+                              ) : (
+                                <StampChip status="CONFIRMED" />
+                              )}
+                            </DataTableCell>
+                            <DataTableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                {canCancel && meeting.uid && (
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => window.open(`/reschedule/${meeting.uid}`, '_blank')}
+                                  >
+                                    RESCHEDULE
+                                  </Button>
+                                )}
+                                {canCancel && (
+                                  <Button
+                                    variant="danger"
+                                    size="sm"
+                                    onClick={() => handleCancelMeetingClick(meeting.id)}
+                                    disabled={cancellingId === meeting.id}
+                                  >
+                                    {cancellingId === meeting.id ? 'CANCELLING...' : 'CANCEL'}
+                                  </Button>
+                                )}
+                                {canMarkNoShow && (
+                                  <Button
+                                    variant="danger"
+                                    size="sm"
+                                    onClick={() => handleMarkNoShowClick(meeting.id)}
+                                    disabled={markingNoShowId === meeting.id}
+                                  >
+                                    {markingNoShowId === meeting.id ? 'MARKING...' : 'MARK NO-SHOW'}
+                                  </Button>
+                                )}
+                              </div>
+                            </DataTableCell>
+                          </DataTableRow>
+                        );
+                      })}
+                    </DataTableBody>
+                  </DataTable>
+                )}
+                {totalCount > 0 && (
+                  <Pagination
+                    currentPage={page}
+                    totalPages={totalPages}
+                    onPageChange={setPage}
+                  />
+                )}
+              </>
+            ) : (
+              <div className="flex h-[260px] flex-col items-center justify-center text-center">
+                <span className="material-symbols-outlined text-[48px] text-clay/60 mb-4">calendar_month</span>
 
-                        </div>
-                      </DataTableCell>
-                    </DataTableRow>
-                  );
-                })}
-              </DataTableBody>
-            </DataTable>
-              )}
-            </>
-          ) : (
-            <div className="flex h-[260px] flex-col items-center justify-center text-center">
-              <span className="material-symbols-outlined text-[48px] text-clay/60 mb-4">calendar_month</span>
+                <h2 className="font-display text-[18px] font-bold text-ink">No Events Yet</h2>
+                <p className="mt-2 text-sm text-ink/70 max-w-sm mx-auto">
+                  Share your link to your event types to start receiving bookings.
+                </p>
 
-              <h2 className="font-display text-[18px] font-bold text-ink">No Events Yet</h2>
-              <p className="mt-2 text-sm text-ink/70 max-w-sm mx-auto">
-                Share your link to your event types to start receiving bookings.
-              </p>
-
-              <Button className="mt-6" onClick={() => window.location.href = "/"}>
-                VIEW EVENT TYPES
-              </Button>
-            </div>
-          )}
-          {totalCount > 0 && (
-            <Pagination
-              currentPage={page}
-              totalPages={totalPages}
-              onPageChange={setPage}
-            />
-          )}
-        </div>
-      </div>
+                <Button className="mt-6" onClick={() => window.location.href = "/"}>
+                  VIEW EVENT TYPES
+                </Button>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <ConfirmDialog
         isOpen={cancelConfirmId !== null}

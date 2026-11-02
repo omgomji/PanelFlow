@@ -1,6 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { useToast } from '@/components/ui/Toast';
 
 export interface ContactDrawerData {
   name: string;
@@ -18,13 +21,14 @@ type ContactDrawerProps = {
 
 export default function ContactDrawer({ isOpen, onClose, onSave, loading = false }: ContactDrawerProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { showToast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
 
+    setIsSubmitting(true);
     try {
-      setIsSubmitting(true);
       await onSave({
         name: String(formData.get('name') ?? '').trim(),
         email: String(formData.get('email') ?? '').trim(),
@@ -33,6 +37,21 @@ export default function ContactDrawer({ isOpen, onClose, onSave, loading = false
       });
 
       e.currentTarget.reset();
+
+      showToast({
+        title: 'Contact created',
+        message: `New contact added.`,
+        type: 'success',
+      });
+
+      onClose();
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Something went wrong. Please try again.';
+      showToast({
+        title: 'Failed to save',
+        message,
+        type: 'error',
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -42,98 +61,106 @@ export default function ContactDrawer({ isOpen, onClose, onSave, loading = false
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-slate-900/20" onClick={onClose} />
+      <div
+        className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-md"
+        onClick={onClose}
+        aria-hidden="true"
+      />
 
-      <aside className="fixed right-0 top-0 z-50 h-screen w-full max-w-md overflow-y-auto bg-white shadow-2xl animate-in slide-in-from-right duration-300">
-        <div className="sticky top-0 border-b border-slate-200 bg-white p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[18px] font-bold text-slate-900">New contact</h2>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-full p-2 text-slate-600 transition-colors hover:bg-slate-100"
-              aria-label="Close drawer"
-            >
-              <span className="material-symbols-outlined text-[20px]">close</span>
-            </button>
+      <div className="fixed right-0 top-0 w-full max-w-md h-screen z-50 bg-paper shadow-2xl overflow-y-auto flex flex-col border-l-2 border-ink ring-1 ring-ink/10">
+        <div className="sticky top-0 bg-paper border-b-2 border-ink p-4 flex items-center justify-between">
+          <div className="flex-1 min-w-0">
+            <div className="text-[11px] font-medium font-bold text-ink/60 uppercase tracking-wider mb-1">
+              Create Contact
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-6 w-6 rounded-sm bg-clay/10 flex items-center justify-center text-clay shrink-0">
+                <span className="material-symbols-outlined text-[18px] font-display font-semibold tracking-wide">person_add</span>
+              </div>
+              <input
+                id="contact-name"
+                type="text"
+                required
+                autoFocus
+                placeholder="e.g. Jane Doe"
+                className={`w-full bg-transparent text-[18px] font-bold text-ink outline-none placeholder:text-clay/40 ${''}`}
+                aria-label="Contact name"
+              />
+            </div>
           </div>
-          <p className="mt-1 text-[12px] text-slate-500">Add a contact with basic details for follow-up.</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="ml-3 p-2 hover:bg-clay/10 rounded-sm transition-colors text-ink/70 shrink-0"
+            aria-label="Close drawer"
+          >
+            <span className="material-symbols-outlined text-[20px] font-display font-semibold tracking-wide">close</span>
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 p-4">
-          <div>
-            <label htmlFor="contact-name" className="mb-1 block text-[12px] font-semibold text-slate-700">
-              Name
-            </label>
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Name */}
+          <section className="space-y-2 border-b-2 border-ink pb-4">
+            <label className="text-[11px] font-medium font-bold text-ink/70 uppercase tracking-wider">Name</label>
             <input
               id="contact-name"
               name="name"
               type="text"
               required
               placeholder="OM"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-[13px] text-slate-800 focus:border-primary focus:outline-none"
+              className="w-full rounded-sm border-2 border-ink bg-clay/5 px-3 py-2 text-[13px] font-medium text-ink/90 outline-none focus:border-stamp border-2"
             />
-          </div>
+          </section>
 
-          <div>
-            <label htmlFor="contact-email" className="mb-1 block text-[12px] font-semibold text-slate-700">
-              Email
-            </label>
+          {/* Email */}
+          <section className="space-y-2 border-b-2 border-ink pb-4">
+            <label className="text-[11px] font-medium font-bold text-ink/70 uppercase tracking-wider">Email</label>
             <input
               id="contact-email"
               name="email"
               type="email"
               required
               placeholder="om@example.com"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-[13px] text-slate-800 focus:border-primary focus:outline-none"
+              className="w-full rounded-sm border-2 border-ink bg-clay/5 px-3 py-2 text-[13px] font-medium text-ink/90 outline-none focus:border-stamp border-2"
             />
-          </div>
+          </section>
 
-          <div>
-            <label htmlFor="contact-phone" className="mb-1 block text-[12px] font-semibold text-slate-700">
-              Contact
-            </label>
+          {/* Phone */}
+          <section className="space-y-2 border-b-2 border-ink pb-4">
+            <label className="text-[11px] font-medium font-bold text-ink/70 uppercase tracking-wider">Phone</label>
             <input
               id="contact-phone"
               name="phone"
               type="tel"
               placeholder="+1 555 123 4567"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-[13px] text-slate-800 focus:border-primary focus:outline-none"
+              className="w-full rounded-sm border-2 border-ink bg-clay/5 px-3 py-2 text-[13px] font-medium text-ink/90 outline-none focus:border-stamp border-2"
             />
-          </div>
+          </section>
 
-          <div>
-            <label htmlFor="contact-note" className="mb-1 block text-[12px] font-semibold text-slate-700">
-              Note
-            </label>
+          {/* Note */}
+          <section className="space-y-2 border-b-2 border-ink pb-4">
+            <label className="text-[11px] font-medium font-bold text-ink/70 uppercase tracking-wider">Note</label>
             <textarea
               id="contact-note"
               name="note"
               rows={4}
               placeholder="Add context about this contact"
-              className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-[13px] text-slate-800 focus:border-primary focus:outline-none"
+              className="w-full resize-none rounded-sm border-2 border-ink bg-clay/5 px-3 py-2 text-[13px] font-medium text-ink/90 outline-none focus:border-stamp border-2"
             />
-          </div>
+          </section>
 
-          <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="inline-flex h-9 items-center rounded-full border border-slate-300 px-4 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
+          {/* Submit */}
+          <div className="pt-6">
+            <Button
               type="submit"
-              disabled={isSubmitting}
-              className="inline-flex h-9 items-center rounded-full bg-primary px-4 text-[12px] font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isSubmitting || loading}
+              className="w-full py-3.5 px-6 text-[13px] font-medium font-bold text-paper uppercase tracking-wider"
             >
-              {isSubmitting ? 'Saving...' : 'Save contact'}
-            </button>
+              {isSubmitting || loading ? 'Saving…' : 'Save contact'}
+            </Button>
           </div>
         </form>
-      </aside>
+      </div>
     </>
   );
 }

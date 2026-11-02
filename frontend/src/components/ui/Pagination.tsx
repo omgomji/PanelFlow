@@ -38,11 +38,11 @@ export const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages,
           </p>
         </div>
         <div>
-          <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm border border-ink" aria-label="Pagination">
+          <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm border-2 border-ink" aria-label="Pagination">
             <button
               onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className="relative inline-flex items-center px-2 py-2 text-ink/70 hover:bg-clay/10 disabled:opacity-50 disabled:cursor-not-allowed border-r border-ink"
+              className="relative inline-flex items-center px-2 py-2 text-ink/70 hover:bg-clay/10 disabled:opacity-50 disabled:cursor-not-allowed border-r-2 border-ink"
             >
               <span className="sr-only">Previous</span>
               <span className="material-symbols-outlined text-[20px]">chevron_left</span>

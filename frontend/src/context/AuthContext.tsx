@@ -19,24 +19,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Hydrate from /auth/me on mount (cookie is httpOnly — JS can't read it directly)
   useEffect(() => {
+    let active = true;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-    getMe(controller.signal)
-      .then((data) => {
-        document.cookie = 'isLoggedIn=true; path=/; max-age=21600';
-        setUser(data.user);
-      })
-      .catch(() => {
-        document.cookie = 'isLoggedIn=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-        setUser(null);
-      })
-      .finally(() => {
+    const hydrate = async () => {
+      try {
+        let data;
+        try {
+          data = await getMe(controller.signal);
+        } catch (error) {
+          if (controller.signal.aborted || (error instanceof Error && error.name === 'AbortError')) {
+            throw error;
+          }
+          await new Promise<void>((resolve) => setTimeout(resolve, 500));
+          data = await getMe(controller.signal);
+        }
+
+        if (active) setUser(data.user);
+      } catch {
+        if (active) setUser(null);
+      } finally {
         clearTimeout(timeoutId);
-        setLoading(false);
-      });
+        if (active) setLoading(false);
+      }
+    };
+
+    void hydrate();
 
     return () => {
+      active = false;
       clearTimeout(timeoutId);
       controller.abort();
     };
@@ -45,7 +57,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     await apiLogin(email, password);
     const data = await getMe();
-    document.cookie = 'isLoggedIn=true; path=/; max-age=21600';
     setUser(data.user);
   }, []);
 
@@ -53,7 +64,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await apiLogout();
     } finally {
-      document.cookie = 'isLoggedIn=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
       setUser(null);
       window.location.href = '/login';
     }

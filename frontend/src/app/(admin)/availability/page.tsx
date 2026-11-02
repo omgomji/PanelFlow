@@ -1527,11 +1527,11 @@ export default function AvailabilityPage() {
                 key={dayNumber}
                 type="button"
                 onClick={() => setSelectedCalendarDate(date)}
-                className={`h-[72px] rounded-sm border bg-paper px-1.5 py-1 text-left hover:border-stamp border-2 sm:h-[82px] sm:px-2 ${
- isSelected
- ? 'border-stamp border-2 ring-1 ring-stamp/30'
- : 'border-ink border-2'
- }`}
+                className={`h-[72px] rounded-sm border-2 bg-paper px-1.5 py-1 text-left hover:border-stamp border-2 sm:h-[82px] sm:px-2 ${
+  isSelected
+    ? 'border-stamp border-2 ring-1 ring-stamp/30'
+    : 'border-ink border-2'
+}`}
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-ink/90">{dayNumber}</span>
