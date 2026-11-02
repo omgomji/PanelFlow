@@ -54,7 +54,9 @@ app.use(cors({
       callback(null, true);
       return;
     }
-    callback(new Error('Origin is not allowed by CORS'));
+    // Reject the origin without turning a normal browser CORS denial into a
+    // server error that is logged and reported by Sentry.
+    callback(null, false);
   },
   credentials: true,
 }));
