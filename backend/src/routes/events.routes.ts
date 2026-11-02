@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { getPrimaryFrontendOrigin } from '../config/origins';
 
 const router = Router();
 const clients = new Set<Response>();
@@ -24,7 +25,7 @@ router.get('/slots/stream', (req: Request, res: Response) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
-  res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'http://localhost:3000');
+  res.setHeader('Access-Control-Allow-Origin', getPrimaryFrontendOrigin());
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.flushHeaders();
 
@@ -38,4 +39,3 @@ router.get('/slots/stream', (req: Request, res: Response) => {
 });
 
 export default router;
-

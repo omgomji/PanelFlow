@@ -36,6 +36,7 @@ import eventsRouter from './routes/events.routes';
 import { requireAuth } from './middleware/auth';
 import { errorHandler } from './middleware/errorHandler';
 import { csrfOriginProtection, rateLimit } from './middleware/security';
+import { isAllowedFrontendOrigin } from './config/origins';
 
 dotenv.config();
 
@@ -49,7 +50,7 @@ const isAllowedDevelopmentOrigin = (origin: string) =>
 // CORS: exact origin required when credentials:true — '*' is rejected by browsers.
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || origin === (process.env.FRONTEND_URL || 'http://localhost:3000') || (process.env.NODE_ENV !== 'production' && isAllowedDevelopmentOrigin(origin))) {
+    if (!origin || isAllowedFrontendOrigin(origin) || (process.env.NODE_ENV !== 'production' && isAllowedDevelopmentOrigin(origin))) {
       callback(null, true);
       return;
     }

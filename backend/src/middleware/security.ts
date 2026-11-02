@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { ForbiddenError } from '../utils/errors';
 import { redis } from '../config/redis';
+import { isAllowedFrontendOrigin } from '../config/origins';
 
 const buckets = new Map<string, { count: number; resetAt: number }>();
 
@@ -37,7 +38,7 @@ export function rateLimit(limit: number, windowMs: number) {
 
 export function csrfOriginProtection(req: Request, _res: Response, next: NextFunction) {
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) || !req.cookies?.accessToken) return next();
-  const expected = process.env.FRONTEND_URL || 'http://localhost:3000';
-  if (req.header('origin') !== expected) return next(new ForbiddenError('Invalid request origin'));
+  const origin = req.header('origin');
+  if (!origin || !isAllowedFrontendOrigin(origin)) return next(new ForbiddenError('Invalid request origin'));
   next();
 }
