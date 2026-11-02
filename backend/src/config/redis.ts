@@ -26,7 +26,6 @@ class RedisManager {
 
         this.client.on('connect', () => {
           this.isAvailable = true;
-          console.info('[Redis] Connected to Redis store');
         });
 
         this.client.connect().then(() => {
@@ -114,4 +113,3 @@ class RedisManager {
 }
 
 export const redis = new RedisManager();
-
